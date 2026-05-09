@@ -1,16 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  Bell,
   Download,
   Filter,
-  GraduationCap,
-  Lock,
   PlusCircle,
-  RefreshCw,
-  Search,
-  Settings,
   SquarePen,
 } from "lucide-react";
+import AppHeader from "./appHeader.jsx";
 import "./studentProfileHistory.css";
 
 const API_BASE_URL = "http://localhost:3000";
@@ -89,56 +84,13 @@ function StudentProfileHistory({
 
   return (
     <div className="profile-shell">
-      <header className="profile-topbar">
-        <div className="profile-brand">
-          <div className="profile-brand-icon">
-            <GraduationCap size={16} />
-          </div>
-          <span>Kugan &amp; Associates</span>
-        </div>
-
-        <label className="profile-search">
-          <Search size={16} />
-          <input type="text" placeholder="Search students..." />
-        </label>
-
-        <nav className="profile-nav">
-          <button
-            type="button"
-            className="profile-nav-link"
-            onClick={onOpenDashboard}
-          >
-            Dashboard
-          </button>
-          <button
-            type="button"
-            className="profile-nav-link is-active"
-            onClick={onOpenStudents}
-          >
-            Students
-          </button>
-          <button
-            type="button"
-            className="profile-nav-link"
-            onClick={onOpenCourses}
-          >
-            Courses
-          </button>
-          <button type="button" className="profile-nav-link">
-            Reports
-          </button>
-        </nav>
-
-        <div className="profile-topbar-actions">
-          <button type="button" className="profile-icon-btn">
-            <Bell size={17} />
-          </button>
-          <button type="button" className="profile-icon-btn">
-            <Settings size={17} />
-          </button>
-          <div className="profile-avatar" />
-        </div>
-      </header>
+      <AppHeader
+        currentSection="students"
+        onOpenDashboard={onOpenDashboard}
+        onOpenStudents={onOpenStudents}
+        onOpenCourses={onOpenCourses}
+        searchPlaceholder="Search students..."
+      />
 
       <main className="profile-main">
         <div className="profile-breadcrumb">

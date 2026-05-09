@@ -1,4 +1,5 @@
-import { BookOpen, GraduationCap, Search, SquarePen } from "lucide-react";
+import { BookOpen, SquarePen } from "lucide-react";
+import AppHeader from "./appHeader.jsx";
 import "./courseDetail.css";
 
 function CourseDetail({ course, onOpenDashboard, onOpenStudents, onOpenCourses }) {
@@ -21,43 +22,13 @@ function CourseDetail({ course, onOpenDashboard, onOpenStudents, onOpenCourses }
 
   return (
     <div className="course-detail-shell">
-      <header className="course-detail-topbar">
-        <div className="course-detail-brand">
-          <div className="course-detail-brand-icon">
-            <GraduationCap size={15} />
-          </div>
-          <span>Kugan &amp; Associates</span>
-        </div>
-
-        <label className="course-detail-search">
-          <Search size={16} />
-          <input type="text" placeholder="Search courses..." />
-        </label>
-
-        <nav className="course-detail-nav">
-          <button
-            type="button"
-            className="course-detail-nav-link"
-            onClick={onOpenDashboard}
-          >
-            Dashboard
-          </button>
-          <button
-            type="button"
-            className="course-detail-nav-link"
-            onClick={onOpenCourses}
-          >
-            Courses Catalog
-          </button>
-          <button
-            type="button"
-            className="course-detail-nav-link"
-            onClick={onOpenStudents}
-          >
-            Student Profiles
-          </button>
-        </nav>
-      </header>
+      <AppHeader
+        currentSection="courses"
+        onOpenDashboard={onOpenDashboard}
+        onOpenStudents={onOpenStudents}
+        onOpenCourses={onOpenCourses}
+        searchPlaceholder="Search courses..."
+      />
 
       <main className="course-detail-main">
         <div className="course-detail-breadcrumb">

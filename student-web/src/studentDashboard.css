@@ -486,7 +486,7 @@
 }
 
 .dashboard-course-main strong,
-.dashboard-course-main span,
+.dashboard-course-main > span,
 .dashboard-course-dates span {
   display: block;
 }
@@ -507,16 +507,22 @@
 .dashboard-course-status {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   min-height: 28px;
   padding: 0 10px;
   border-radius: 999px;
   font-size: 12px;
   font-weight: 800;
+  text-align: center;
+  line-height: 1;
+  margin-top: 0;
 }
 
 .dashboard-course-grade {
   background: #f2f6fc;
   color: #60718c;
+  justify-content: center;
+  text-align: center;
 }
 
 .dashboard-course-status.is-complete {
@@ -539,7 +545,7 @@
   color: #7a889d;
 }
 
-.dashboard-course-main span,
+.dashboard-course-main > span,
 .dashboard-course-dates span {
   margin-top: 4px;
   color: #8e9cb0;

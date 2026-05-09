@@ -4,10 +4,10 @@ import {
   ChevronLeft,
   ChevronRight,
   Plus,
-  Search,
   SlidersHorizontal,
   Upload,
 } from "lucide-react";
+import AppHeader from "./appHeader.jsx";
 import "./studentDirectory.css";
 
 const API_BASE_URL = "http://localhost:3000";
@@ -145,57 +145,15 @@ function StudentDirectory({ onOpenDashboard, onOpenCourses, onViewProfile }) {
 
   return (
     <div className="directory-shell">
-      <header className="directory-topbar">
-        <button type="button" className="directory-brand directory-plain-btn">
-          <div className="directory-brand-icon" />
-          <span>Kugan &amp; Associates</span>
-        </button>
-
-        <nav className="directory-nav">
-          <button
-            type="button"
-            className="directory-nav-link"
-            onClick={onOpenDashboard}
-          >
-            Dashboard
-          </button>
-          <button type="button" className="directory-nav-link is-active">
-            Students
-          </button>
-          <button
-            type="button"
-            className="directory-nav-link"
-            onClick={onOpenCourses}
-          >
-            Courses
-          </button>
-          <button type="button" className="directory-nav-link">
-            Reports
-          </button>
-        </nav>
-
-        <div className="directory-toolbar">
-          <label className="directory-search">
-            <Search size={16} />
-            <input
-              type="text"
-              placeholder="Search by name, email, or phone"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-            />
-          </label>
-
-          <button type="button" className="directory-primary-btn">
-            <Plus size={16} />
-            <span>Add New Student</span>
-          </button>
-
-          <button type="button" className="directory-secondary-btn">
-            <Upload size={16} />
-            <span>Import Data</span>
-          </button>
-        </div>
-      </header>
+      <AppHeader
+        currentSection="students"
+        onOpenDashboard={onOpenDashboard}
+        onOpenStudents={() => {}}
+        onOpenCourses={onOpenCourses}
+        searchPlaceholder="Search by name, email, or phone"
+        searchValue={query}
+        onSearchChange={setQuery}
+      />
 
       <main className="directory-main">
         <section className="directory-hero">
@@ -212,6 +170,18 @@ function StudentDirectory({ onOpenDashboard, onOpenCourses, onViewProfile }) {
             <span>Total Students</span>
           </div>
         </section>
+
+        <div className="directory-toolbar" style={{ paddingTop: 10 }}>
+          <button type="button" className="directory-primary-btn">
+            <Plus size={16} />
+            <span>Add New Student</span>
+          </button>
+
+          <button type="button" className="directory-secondary-btn">
+            <Upload size={16} />
+            <span>Import Data</span>
+          </button>
+        </div>
 
         <section className="directory-filter-bar">
           <div className="directory-filters">

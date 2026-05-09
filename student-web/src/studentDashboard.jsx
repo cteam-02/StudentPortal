@@ -4,14 +4,12 @@ import {
   BookOpen,
   Download,
   FileUp,
-  GraduationCap,
-  Search,
   Trash2,
-  UserRound,
   Users,
 } from "lucide-react";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+import AppHeader from "./appHeader.jsx";
 import "./studentDashboard.css";
 
 const API_BASE_URL = "http://localhost:3000";
@@ -147,57 +145,15 @@ function StudentDashboard({
   return (
     <div className="dashboard-shell">
       <ToastContainer position="top-right" autoClose={3000} />
-
-      <header className="dashboard-topbar">
-        <div className="dashboard-brand">
-          <div className="dashboard-brand-icon">
-            <GraduationCap size={16} />
-          </div>
-          <span>Kugan &amp; Associates</span>
-        </div>
-
-        <nav className="dashboard-nav">
-          <button type="button" className="dashboard-nav-link is-active">
-            Dashboard
-          </button>
-          <button
-            type="button"
-            className="dashboard-nav-link"
-            onClick={onOpenStudents}
-          >
-            Students
-          </button>
-          <button
-            type="button"
-            className="dashboard-nav-link"
-            onClick={onOpenCourses}
-          >
-            Courses
-          </button>
-        </nav>
-
-        <div className="dashboard-topbar-actions">
-          <label className="dashboard-searchbar">
-            <Search size={16} />
-            <input
-              type="text"
-              placeholder="Search students, email, phone..."
-              value={searchQuery}
-              onChange={(event) => setSearchQuery(event.target.value)}
-            />
-          </label>
-
-          <div className="dashboard-user">
-            <div className="dashboard-user-avatar">
-              <UserRound size={18} />
-            </div>
-            <div>
-              <strong>Admin User</strong>
-              <span>Student Records</span>
-            </div>
-          </div>
-        </div>
-      </header>
+      <AppHeader
+        currentSection="dashboard"
+        onOpenDashboard={() => {}}
+        onOpenStudents={onOpenStudents}
+        onOpenCourses={onOpenCourses}
+        searchPlaceholder="Search students, email, phone..."
+        searchValue={searchQuery}
+        onSearchChange={setSearchQuery}
+      />
 
       <main className="dashboard-main">
         <section className="dashboard-hero">

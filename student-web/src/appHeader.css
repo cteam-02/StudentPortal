@@ -1,0 +1,147 @@
+.app-header {
+  height: 56px;
+  background: #ffffff;
+  border-bottom: 1px solid #e6edf7;
+  padding: 0 28px;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.app-header-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 170px;
+  color: #1f2a44;
+  font-size: 15px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.app-header-brand-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  background: linear-gradient(180deg, #2f6df6 0%, #1f58df 100%);
+  color: #ffffff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.app-header-nav {
+  display: flex;
+  align-items: center;
+  gap: 26px;
+}
+
+.app-header-nav-link {
+  border: 0;
+  background: transparent;
+  color: #6d7d96;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0;
+}
+
+.app-header-nav-link.is-active {
+  color: #2f6df6;
+}
+
+.app-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-left: auto;
+}
+
+.app-header-search {
+  width: 220px;
+  height: 36px;
+  border-radius: 9px;
+  background: #f2f5fa;
+  color: #a1aec3;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+}
+
+.app-header-search input {
+  width: 100%;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: #44536b;
+  font-size: 13px;
+}
+
+.app-header-user {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.app-header-user-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  border: 2px solid #2f6df6;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(180deg, #ffe4bf 0%, #ffd29f 100%);
+  color: #35507b;
+}
+
+.app-header-user strong,
+.app-header-user span {
+  display: block;
+}
+
+.app-header-user strong {
+  color: #27324b;
+  font-size: 13px;
+}
+
+.app-header-user span {
+  color: #8a97ab;
+  font-size: 12px;
+}
+
+@media (max-width: 920px) {
+  .app-header {
+    height: auto;
+    padding: 16px;
+    flex-wrap: wrap;
+  }
+
+  .app-header-nav {
+    order: 3;
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .app-header-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .app-header-search {
+    width: 100%;
+    max-width: 360px;
+  }
+}
+
+@media (max-width: 640px) {
+  .app-header-actions,
+  .app-header-user {
+    flex-wrap: wrap;
+  }
+
+  .app-header-search {
+    max-width: none;
+  }
+}

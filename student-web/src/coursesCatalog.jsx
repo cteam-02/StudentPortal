@@ -5,9 +5,9 @@ import {
   ChevronRight,
   GraduationCap,
   Plus,
-  Search,
   SquarePen,
 } from "lucide-react";
+import AppHeader from "./appHeader.jsx";
 import "./coursesCatalog.css";
 
 const API_BASE_URL = "http://localhost:3000";
@@ -133,54 +133,15 @@ function CoursesCatalog({ onOpenDashboard, onOpenStudents, onOpenCourseDetail })
 
   return (
     <div className="catalog-shell">
-      <header className="catalog-topbar">
-        <button type="button" className="catalog-brand catalog-plain-btn">
-          <div className="catalog-brand-icon">
-            <GraduationCap size={15} />
-          </div>
-          <span>Kugan &amp; Associates</span>
-        </button>
-
-        <label className="catalog-search">
-          <Search size={16} />
-          <input
-            type="text"
-            placeholder="Search courses..."
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-          />
-        </label>
-
-        <nav className="catalog-nav">
-          <button
-            type="button"
-            className="catalog-nav-link"
-            onClick={onOpenDashboard}
-          >
-            Dashboard
-          </button>
-          <button
-            type="button"
-            className="catalog-nav-link is-active"
-          >
-            Courses Catalog
-          </button>
-          <button
-            type="button"
-            className="catalog-nav-link"
-            onClick={onOpenStudents}
-          >
-            Student Profiles
-          </button>
-          <button
-            type="button"
-            className="catalog-nav-link"
-            onClick={onOpenStudents}
-          >
-            Training History
-          </button>
-        </nav>
-      </header>
+      <AppHeader
+        currentSection="courses"
+        onOpenDashboard={onOpenDashboard}
+        onOpenStudents={onOpenStudents}
+        onOpenCourses={() => {}}
+        searchPlaceholder="Search courses..."
+        searchValue={query}
+        onSearchChange={setQuery}
+      />
 
       <main className="catalog-main">
         <section className="catalog-hero">
