@@ -1,5 +1,5 @@
 import { GraduationCap, Search, UserRound } from "lucide-react";
-import "./appHeader.css";
+import "./AppHeader.css";
 
 function AppHeader({
   currentSection,

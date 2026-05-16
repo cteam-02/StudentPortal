@@ -7,8 +7,8 @@ import {
   SlidersHorizontal,
   Upload,
 } from "lucide-react";
-import AppHeader from "./appHeader.jsx";
-import "./studentDirectory.css";
+import AppHeader from "../../app/components/AppHeader/AppHeader.jsx";
+import "./StudentDirectory.css";
 
 const API_BASE_URL = "http://localhost:3000";
 const pageSize = 10;

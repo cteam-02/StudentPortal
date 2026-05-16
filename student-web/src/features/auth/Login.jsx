@@ -7,7 +7,7 @@ import {
   Lock,
   ShieldCheck,
 } from "lucide-react";
-import "./login.css";
+import "./Login.css";
 
 export default function Login({ onLoginSuccess }) {
   return (

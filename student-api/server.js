@@ -21,6 +21,13 @@ const parseCsvDateTime = (value) => {
   return parsed.toISOString();
 };
 
+const normalizeField = (value) => {
+  if (value === undefined || value === null) return null;
+
+  const normalized = String(value).trim();
+  return normalized === "" ? null : normalized;
+};
+
 app.get("/", (req, res) => {
   res.send("Student API is running");
 });
@@ -84,6 +91,8 @@ app.get("/students/:id/courses", async (req, res) => {
 
 app.post("/upload-students", upload.single("file"), async (req, res) => {
   const results = [];
+  let insertedCount = 0;
+  let skippedDuplicates = 0;
 
   console.log("NEW upload-students API running");
 
@@ -157,14 +166,51 @@ app.post("/upload-students", upload.single("file"), async (req, res) => {
           }
 
           const courseId = courseRes.rows[0].id;
+          const normalizedStatus = normalizeField(row["status"]);
+          const normalizedGrade = normalizeField(row["grade"]);
+
           console.log("CourseHistory insert payload:", {
             studentId,
             courseId,
             beginDate,
             completionDate,
-            status: row["status"],
-            grade: row["grade"],
+            status: normalizedStatus,
+            grade: normalizedGrade,
           });
+
+          const duplicateHistoryRes = await pool.query(
+            `
+            SELECT 1
+            FROM CourseHistory
+            WHERE student_id = $1
+              AND course_id = $2
+              AND begin_date IS NOT DISTINCT FROM $3
+              AND completion_date IS NOT DISTINCT FROM $4
+              AND status IS NOT DISTINCT FROM $5
+              AND grade IS NOT DISTINCT FROM $6
+            LIMIT 1
+            `,
+            [
+              studentId,
+              courseId,
+              beginDate,
+              completionDate,
+              normalizedStatus,
+              normalizedGrade,
+            ]
+          );
+
+          if (duplicateHistoryRes.rowCount > 0) {
+            console.log("Skipping duplicate CourseHistory row", {
+              studentId,
+              courseId,
+              beginDate,
+              completionDate,
+            });
+            skippedDuplicates += 1;
+            continue;
+          }
+
           await pool.query(
             `
 INSERT INTO CourseHistory
@@ -176,15 +222,18 @@ VALUES ($1, $2, $3, $4, $5, $6)
               courseId,
               beginDate,
               completionDate,
-              row["status"],
-              row["grade"],
+              normalizedStatus,
+              normalizedGrade,
             ]
           );
+          insertedCount += 1;
         }
 
         res.json({
           message: "Students & courses imported successfully 🎉",
-          insertedRows: results.length,
+          processedRows: results.length,
+          insertedRows: insertedCount,
+          skippedDuplicates,
         });
       } catch (error) {
         res.status(500).json({ error: error.message });

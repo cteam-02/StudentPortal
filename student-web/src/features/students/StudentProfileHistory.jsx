@@ -4,9 +4,10 @@ import {
   Filter,
   PlusCircle,
   SquarePen,
+  GraduationCap
 } from "lucide-react";
-import AppHeader from "./appHeader.jsx";
-import "./studentProfileHistory.css";
+import AppHeader from "../../app/components/AppHeader/AppHeader.jsx";
+import "./StudentProfileHistory.css";
 
 const API_BASE_URL = "http://localhost:3000";
 

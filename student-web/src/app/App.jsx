@@ -1,10 +1,10 @@
 import { useState } from "react";
-import Login from "./login.jsx";
-import StudentDashboard from "./studentDashboard.jsx";
-import StudentDirectory from "./studentDirectory.jsx";
-import StudentProfileHistory from "./studentProfileHistory.jsx";
-import CoursesCatalog from "./coursesCatalog.jsx";
-import CourseDetail from "./courseDetail.jsx";
+import Login from "../features/auth/Login.jsx";
+import StudentDashboard from "../features/dashboard/StudentDashboard.jsx";
+import StudentDirectory from "../features/students/StudentDirectory.jsx";
+import StudentProfileHistory from "../features/students/StudentProfileHistory.jsx";
+import CoursesCatalog from "../features/courses/CoursesCatalog.jsx";
+import CourseDetail from "../features/courses/CourseDetail.jsx";
 
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);

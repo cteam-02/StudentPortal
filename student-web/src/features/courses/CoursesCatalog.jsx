@@ -7,8 +7,8 @@ import {
   Plus,
   SquarePen,
 } from "lucide-react";
-import AppHeader from "./appHeader.jsx";
-import "./coursesCatalog.css";
+import AppHeader from "../../app/components/AppHeader/AppHeader.jsx";
+import "./CoursesCatalog.css";
 
 const API_BASE_URL = "http://localhost:3000";
 const pageSize = 10;
@@ -186,7 +186,7 @@ function CoursesCatalog({ onOpenDashboard, onOpenStudents, onOpenCourseDetail })
                     </div>
                     <div className="catalog-course-copy">
                       <strong>{course.title || "Untitled course"}</strong>
-                      <span>
+                      <span style={{ paddingTop: "5px" }}>
                         {course.enrollmentCount > 0
                           ? `${course.activeEnrollments} active enrollments`
                           : "No enrollments yet"}

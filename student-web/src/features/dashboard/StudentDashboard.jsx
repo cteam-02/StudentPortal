@@ -9,8 +9,8 @@ import {
 } from "lucide-react";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-import AppHeader from "./appHeader.jsx";
-import "./studentDashboard.css";
+import AppHeader from "../../app/components/AppHeader/AppHeader.jsx";
+import "./StudentDashboard.css";
 
 const API_BASE_URL = "http://localhost:3000";
 

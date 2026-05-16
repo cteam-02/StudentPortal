@@ -1,6 +1,6 @@
 import { BookOpen, SquarePen } from "lucide-react";
-import AppHeader from "./appHeader.jsx";
-import "./courseDetail.css";
+import AppHeader from "../../app/components/AppHeader/AppHeader.jsx";
+import "./CourseDetail.css";
 
 function CourseDetail({ course, onOpenDashboard, onOpenStudents, onOpenCourses }) {
   const title = course?.title || "Untitled course";
