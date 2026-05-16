@@ -17,6 +17,7 @@ const API_BASE_URL = "http://localhost:3000";
 function StudentDashboard({
   onOpenStudents,
   onOpenCourses,
+  onOpenPending,
   onOpenProfile,
   focusedStudentId,
   onFocusedStudentHandled,
@@ -87,10 +88,15 @@ function StudentDashboard({
       }
 
       await fetchStudents();
+      const pendingText =
+        result.pendingConfirmations > 0
+          ? `, sent ${result.pendingConfirmations} to pending review`
+          : "";
+
       toast.success(
         `Imported ${result.insertedRows ?? 0} rows, skipped ${
           result.skippedDuplicates ?? 0
-        } duplicates`
+        } duplicates${pendingText}`
       );
     } catch (error) {
       console.error("Error uploading students:", error);
@@ -157,6 +163,7 @@ function StudentDashboard({
         onOpenDashboard={() => {}}
         onOpenStudents={onOpenStudents}
         onOpenCourses={onOpenCourses}
+        onOpenPending={onOpenPending}
         searchPlaceholder="Search students, email, phone..."
         searchValue={searchQuery}
         onSearchChange={setSearchQuery}

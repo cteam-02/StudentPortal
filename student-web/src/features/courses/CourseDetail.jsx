@@ -2,7 +2,13 @@ import { BookOpen, SquarePen } from "lucide-react";
 import AppHeader from "../../app/components/AppHeader/AppHeader.jsx";
 import "./CourseDetail.css";
 
-function CourseDetail({ course, onOpenDashboard, onOpenStudents, onOpenCourses }) {
+function CourseDetail({
+  course,
+  onOpenDashboard,
+  onOpenStudents,
+  onOpenCourses,
+  onOpenPending,
+}) {
   const title = course?.title || "Untitled course";
   const descriptionHtml =
     course?.description ||
@@ -27,6 +33,7 @@ function CourseDetail({ course, onOpenDashboard, onOpenStudents, onOpenCourses }
         onOpenDashboard={onOpenDashboard}
         onOpenStudents={onOpenStudents}
         onOpenCourses={onOpenCourses}
+        onOpenPending={onOpenPending}
         searchPlaceholder="Search courses..."
       />
 

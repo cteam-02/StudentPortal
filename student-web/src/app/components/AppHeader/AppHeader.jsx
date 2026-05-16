@@ -6,6 +6,7 @@ function AppHeader({
   onOpenDashboard,
   onOpenStudents,
   onOpenCourses,
+  onOpenPending,
   searchPlaceholder = "Search...",
   searchValue = "",
   onSearchChange,
@@ -46,6 +47,15 @@ function AppHeader({
           onClick={onOpenCourses}
         >
           Courses
+        </button>
+        <button
+          type="button"
+          className={`app-header-nav-link${
+            currentSection === "pending" ? " is-active" : ""
+          }`}
+          onClick={onOpenPending}
+        >
+          Pending
         </button>
       </nav>
 

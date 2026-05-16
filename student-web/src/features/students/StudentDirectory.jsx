@@ -12,7 +12,12 @@ import "./StudentDirectory.css";
 const API_BASE_URL = "http://localhost:3000";
 const pageSize = 10;
 
-function StudentDirectory({ onOpenDashboard, onOpenCourses, onViewProfile }) {
+function StudentDirectory({
+  onOpenDashboard,
+  onOpenCourses,
+  onOpenPending,
+  onViewProfile,
+}) {
   const [students, setStudents] = useState([]);
   const [query, setQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
@@ -149,6 +154,7 @@ function StudentDirectory({ onOpenDashboard, onOpenCourses, onViewProfile }) {
         onOpenDashboard={onOpenDashboard}
         onOpenStudents={() => {}}
         onOpenCourses={onOpenCourses}
+        onOpenPending={onOpenPending}
         searchPlaceholder="Search by name, email, or phone"
         searchValue={query}
         onSearchChange={setQuery}

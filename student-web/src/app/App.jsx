@@ -3,6 +3,7 @@ import Login from "../features/auth/Login.jsx";
 import StudentDashboard from "../features/dashboard/StudentDashboard.jsx";
 import StudentDirectory from "../features/students/StudentDirectory.jsx";
 import StudentProfileHistory from "../features/students/StudentProfileHistory.jsx";
+import PendingConfirmations from "../features/students/PendingConfirmations.jsx";
 import CoursesCatalog from "../features/courses/CoursesCatalog.jsx";
 import CourseDetail from "../features/courses/CourseDetail.jsx";
 
@@ -28,6 +29,10 @@ function App() {
 
   const openCourses = () => {
     setCurrentView("courses");
+  };
+
+  const openPending = () => {
+    setCurrentView("pending");
   };
 
   const openCourseDetail = (course) => {
@@ -62,6 +67,7 @@ function App() {
       <StudentDirectory
         onOpenDashboard={openDashboard}
         onOpenCourses={openCourses}
+        onOpenPending={openPending}
         onViewProfile={handleViewProfile}
       />
     );
@@ -74,6 +80,18 @@ function App() {
         onOpenDashboard={openDashboard}
         onOpenStudents={openStudentsFromProfile}
         onOpenCourses={openCourses}
+        onOpenPending={openPending}
+      />
+    );
+  }
+
+  if (isLoggedIn && currentView === "pending") {
+    return (
+      <PendingConfirmations
+        onOpenDashboard={openDashboard}
+        onOpenStudents={openStudents}
+        onOpenCourses={openCourses}
+        onViewProfile={handleViewProfile}
       />
     );
   }
@@ -83,6 +101,7 @@ function App() {
       <CoursesCatalog
         onOpenDashboard={openDashboard}
         onOpenStudents={openStudents}
+        onOpenPending={openPending}
         onOpenCourseDetail={openCourseDetail}
       />
     );
@@ -95,6 +114,7 @@ function App() {
         onOpenDashboard={openDashboard}
         onOpenStudents={openStudents}
         onOpenCourses={openCourses}
+        onOpenPending={openPending}
       />
     );
   }
@@ -104,6 +124,7 @@ function App() {
       <StudentDashboard
         onOpenStudents={openStudents}
         onOpenCourses={openCourses}
+        onOpenPending={openPending}
         onOpenProfile={openProfile}
         focusedStudentId={focusedStudentId}
         onFocusedStudentHandled={clearFocusedStudent}

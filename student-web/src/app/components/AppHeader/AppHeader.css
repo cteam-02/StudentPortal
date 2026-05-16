@@ -33,7 +33,8 @@
 .app-header-nav {
   display: flex;
   align-items: center;
-  gap: 26px;
+  gap: 20px;
+  flex-wrap: wrap;
 }
 
 .app-header-nav-link {
@@ -44,6 +45,7 @@
   font-weight: 700;
   cursor: pointer;
   padding: 0;
+  white-space: nowrap;
 }
 
 .app-header-nav-link.is-active {

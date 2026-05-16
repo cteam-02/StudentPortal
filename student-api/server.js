@@ -5,6 +5,7 @@ require("dotenv").config();
 const multer = require("multer");
 const csv = require("csv-parser");
 const fs = require("fs");
+
 const app = express();
 app.use(cors());
 app.use(express.json());
@@ -28,16 +29,165 @@ const normalizeField = (value) => {
   return normalized === "" ? null : normalized;
 };
 
+const normalizeText = (value) => normalizeField(value)?.toLowerCase() || null;
+
+async function ensurePendingConfirmationTable() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS PendingStudentConfirmation (
+      id SERIAL PRIMARY KEY,
+      imported_name TEXT NOT NULL,
+      imported_email TEXT,
+      imported_phone TEXT,
+      offering_title TEXT NOT NULL,
+      course_id INTEGER REFERENCES Course(id),
+      begin_date TIMESTAMPTZ,
+      completion_date TIMESTAMPTZ,
+      status TEXT,
+      grade TEXT,
+      matched_student_id INTEGER REFERENCES Student(id),
+      resolution_status TEXT NOT NULL DEFAULT 'pending',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+}
+
+async function findExistingStudentByFullMatch(email, fullName, phone) {
+  return pool.query(
+    `
+    SELECT id, name, email, phone
+    FROM Student
+    WHERE LOWER(TRIM(name)) = LOWER(TRIM($1))
+      AND LOWER(TRIM(email)) = LOWER(TRIM($2))
+      AND COALESCE(TRIM(phone), '') = COALESCE(TRIM($3), '')
+    LIMIT 1
+    `,
+    [fullName, email, phone || ""]
+  );
+}
+
+async function findPotentialStudentByAnyTwo(fullName, email, phone) {
+  return pool.query(
+    `
+    SELECT id, name, email, phone
+    FROM Student
+    WHERE (
+      LOWER(TRIM(name)) = LOWER(TRIM($1))
+      AND LOWER(TRIM(email)) = LOWER(TRIM($2))
+    ) OR (
+      LOWER(TRIM(name)) = LOWER(TRIM($1))
+      AND COALESCE(TRIM(phone), '') = COALESCE(TRIM($3), '')
+    ) OR (
+      LOWER(TRIM(email)) = LOWER(TRIM($2))
+      AND COALESCE(TRIM(phone), '') = COALESCE(TRIM($3), '')
+    )
+    ORDER BY id
+    LIMIT 1
+    `,
+    [fullName, email, phone || ""]
+  );
+}
+
+async function findCourseByTitle(offeringTitle) {
+  return pool.query(
+    `
+    SELECT id, title
+    FROM Course
+    WHERE LOWER(TRIM(title)) = LOWER(TRIM($1))
+    LIMIT 1
+    `,
+    [offeringTitle]
+  );
+}
+
+async function hasDuplicateCourseHistory({
+  studentId,
+  courseId,
+  beginDate,
+  completionDate,
+  status,
+  grade,
+}) {
+  const result = await pool.query(
+    `
+    SELECT 1
+    FROM CourseHistory
+    WHERE student_id = $1
+      AND course_id = $2
+      AND begin_date IS NOT DISTINCT FROM $3
+      AND completion_date IS NOT DISTINCT FROM $4
+      AND status IS NOT DISTINCT FROM $5
+      AND grade IS NOT DISTINCT FROM $6
+    LIMIT 1
+    `,
+    [studentId, courseId, beginDate, completionDate, status, grade]
+  );
+
+  return result.rowCount > 0;
+}
+
+async function insertCourseHistory({
+  studentId,
+  courseId,
+  beginDate,
+  completionDate,
+  status,
+  grade,
+}) {
+  return pool.query(
+    `
+    INSERT INTO CourseHistory
+      (student_id, course_id, begin_date, completion_date, status, grade)
+    VALUES ($1, $2, $3, $4, $5, $6)
+    RETURNING student_id, course_id, begin_date, completion_date, status, grade
+    `,
+    [studentId, courseId, beginDate, completionDate, status, grade]
+  );
+}
+
+async function findDuplicatePendingConfirmation({
+  importedName,
+  importedEmail,
+  importedPhone,
+  courseId,
+  beginDate,
+  completionDate,
+  status,
+  grade,
+  matchedStudentId,
+}) {
+  return pool.query(
+    `
+    SELECT id
+    FROM PendingStudentConfirmation
+    WHERE resolution_status = 'pending'
+      AND LOWER(TRIM(imported_name)) = LOWER(TRIM($1))
+      AND COALESCE(LOWER(TRIM(imported_email)), '') = COALESCE(LOWER(TRIM($2)), '')
+      AND COALESCE(TRIM(imported_phone), '') = COALESCE(TRIM($3), '')
+      AND course_id = $4
+      AND begin_date IS NOT DISTINCT FROM $5
+      AND completion_date IS NOT DISTINCT FROM $6
+      AND status IS NOT DISTINCT FROM $7
+      AND grade IS NOT DISTINCT FROM $8
+      AND matched_student_id = $9
+    LIMIT 1
+    `,
+    [
+      importedName,
+      importedEmail,
+      importedPhone,
+      courseId,
+      beginDate,
+      completionDate,
+      status,
+      grade,
+      matchedStudentId,
+    ]
+  );
+}
+
 app.get("/", (req, res) => {
   res.send("Student API is running");
 });
-
-const port = process.env.PORT || 3000;
-
-app.listen(port, () => {
-  console.log(`Server running on http://localhost:${port}`);
-});
-
 
 app.get("/students", async (req, res) => {
   try {
@@ -56,7 +206,6 @@ app.get("/courses", async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
-
 
 app.get("/students/:id/courses", async (req, res) => {
   try {
@@ -88,37 +237,47 @@ app.get("/students/:id/courses", async (req, res) => {
   }
 });
 
+app.get("/pending-confirmations", async (req, res) => {
+  try {
+    const result = await pool.query(
+      `
+      SELECT
+        pc.id,
+        pc.imported_name,
+        pc.imported_email,
+        pc.imported_phone,
+        pc.offering_title,
+        pc.begin_date,
+        pc.completion_date,
+        pc.status,
+        pc.grade,
+        pc.matched_student_id,
+        pc.created_at,
+        s.name AS matched_student_name,
+        s.email AS matched_student_email,
+        s.phone AS matched_student_phone
+      FROM PendingStudentConfirmation pc
+      LEFT JOIN Student s ON s.id = pc.matched_student_id
+      WHERE pc.resolution_status = 'pending'
+      ORDER BY pc.created_at DESC, pc.id DESC
+      `
+    );
+
+    res.json(result.rows);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
 
 // Upload a CSV file and translate each row into:
-// 1. a Student record (matched first by email + full name)
-// 2. a CourseHistory record (matched by course title + enrollment details)
-//
-// Request:
-//   POST /upload-students
-//   Content-Type: multipart/form-data
-//   form field: file=<students.csv>
-//
-// Example CSV columns used by this API:
-//   Student First Name, Student Last Name, Student Email, Phone Number,
-//   Offering Title, Begin Date, Completion Date, Status, Grade
-//
-// Example row:
-//   John,Doe,john.doe@example.com,555-111-2222,EM385-1-1,
-//   4/22/22, 7:45:21 PM UTC,7/5/22, 5:06:46 PM UTC,Passed,94
-//
-// Response example:
-//   {
-//     message: "Students & courses imported successfully 🎉",
-//     processedRows: 10,
-//     insertedRows: 8,
-//     skippedDuplicates: 2
-//   }
+// 1. If name + email + phone + course match, ignore as duplicate.
+// 2. If name + email + phone match but course differs, add new course history.
+// 3. If any two of name + email + phone match, but the third differs, create a pending confirmation row.
 app.post("/upload-students", upload.single("file"), async (req, res) => {
   const results = [];
   let insertedCount = 0;
   let skippedDuplicates = 0;
-
-  console.log("NEW upload-students API running");
+  let pendingConfirmations = 0;
 
   fs.createReadStream(req.file.path)
     .pipe(csv())
@@ -126,11 +285,7 @@ app.post("/upload-students", upload.single("file"), async (req, res) => {
       const cleanRow = {};
 
       Object.keys(row).forEach((key) => {
-        const cleanKey = key
-          .replace(/^\uFEFF/, "")
-          .trim()
-          .toLowerCase();
-
+        const cleanKey = key.replace(/^\uFEFF/, "").trim().toLowerCase();
         cleanRow[cleanKey] = row[key];
       });
 
@@ -139,12 +294,14 @@ app.post("/upload-students", upload.single("file"), async (req, res) => {
     .on("end", async () => {
       try {
         for (const row of results) {
-          // Extract the fields this API cares about from the normalized CSV row.
           const offeringTitle = row["offering title"]?.trim();
-          const email = row["student email"]?.toLowerCase().trim();
+          const email = normalizeText(row["student email"]);
           const fullName = `${row["student first name"] || ""} ${row["student last name"] || ""}`.trim();
+          const phone = normalizeField(row["phone number"]);
           const beginDate = parseCsvDateTime(row["begin date"]);
           const completionDate = parseCsvDateTime(row["completion date"]);
+          const normalizedStatus = normalizeField(row["status"]);
+          const normalizedGrade = normalizeField(row["grade"]);
 
           if (!offeringTitle) {
             throw new Error("Offering Title is missing in CSV");
@@ -154,65 +311,192 @@ app.post("/upload-students", upload.single("file"), async (req, res) => {
             throw new Error("Student Email is missing in CSV");
           }
 
-          console.log("Raw begin date:", row["begin date"]);
-          console.log("Raw completion date:", row["completion date"]);
-          console.log("Parsed begin date:", beginDate);
-          console.log("Parsed completion date:", completionDate);
-
-          // First try to find the same student by both email and full name.
-          // This is our duplicate-match rule for Student imports.
-          const existingStudentRes = await pool.query(
-            `
-            SELECT id
-            FROM Student
-            WHERE LOWER(TRIM(email)) = LOWER(TRIM($1))
-              AND LOWER(TRIM(name)) = LOWER(TRIM($2))
-            LIMIT 1
-            `,
-            [email, fullName]
-          );
-
-          let studentId;
-
-          if (existingStudentRes.rowCount > 0) {
-            studentId = existingStudentRes.rows[0].id;
-          } else {
-            // If the email already exists with a different name, PostgreSQL's
-            // unique email constraint still forces us to reuse that student row.
-            const studentRes = await pool.query(
-              `
-              INSERT INTO Student (name, email, phone)
-              VALUES ($1, $2, $3)
-              ON CONFLICT (email) DO UPDATE
-              SET name = EXCLUDED.name
-              RETURNING id
-              `,
-              [fullName, email, row["phone number"]]
-            );
-
-            studentId = studentRes.rows[0].id;
-          }
-
-          // Resolve the course by title. The CSV does not contain course_id,
-          // so we map "Offering Title" -> Course.id here.
-          const courseRes = await pool.query(
-            `
-            SELECT id, title
-            FROM Course
-            WHERE LOWER(TRIM(title)) = LOWER(TRIM($1))
-            `,
-            [offeringTitle]
-          );
-
+          const courseRes = await findCourseByTitle(offeringTitle);
           if (courseRes.rowCount === 0) {
             throw new Error(`Course not found: ${offeringTitle}`);
           }
 
           const courseId = courseRes.rows[0].id;
-          const normalizedStatus = normalizeField(row["status"]);
-          const normalizedGrade = normalizeField(row["grade"]);
+          console.log("Evaluating import row", {
+            fullName,
+            email,
+            phone,
+            offeringTitle,
+          });
 
-          console.log("CourseHistory insert payload:", {
+          const exactStudentRes = await findExistingStudentByFullMatch(
+            email,
+            fullName,
+            phone
+          );
+
+          console.log("Exact student match result", {
+            fullName,
+            email,
+            phone,
+            rowCount: exactStudentRes.rowCount,
+            matchedStudent: exactStudentRes.rows[0] || null,
+          });
+
+          if (exactStudentRes.rowCount > 0) {
+            const studentId = exactStudentRes.rows[0].id;
+            const isDuplicate = await hasDuplicateCourseHistory({
+              studentId,
+              courseId,
+              beginDate,
+              completionDate,
+              status: normalizedStatus,
+              grade: normalizedGrade,
+            });
+
+            if (isDuplicate) {
+              skippedDuplicates += 1;
+              console.log("Skipping duplicate CourseHistory row", {
+                studentId,
+                courseId,
+                beginDate,
+                completionDate,
+              });
+              continue;
+            }
+
+            const insertHistoryRes = await insertCourseHistory({
+              studentId,
+              courseId,
+              beginDate,
+              completionDate,
+              status: normalizedStatus,
+              grade: normalizedGrade,
+            });
+
+            insertedCount += 1;
+            console.log("CourseHistory row inserted successfully", {
+              insertedRow: insertHistoryRes.rows[0],
+              insertedCount,
+              skippedDuplicates,
+            });
+            continue;
+          }
+
+          const potentialStudentRes = await findPotentialStudentByAnyTwo(
+            fullName,
+            email,
+            phone
+          );
+
+          console.log("Potential two-field match result", {
+            fullName,
+            email,
+            phone,
+            rowCount: potentialStudentRes.rowCount,
+            matchedStudent: potentialStudentRes.rows[0] || null,
+          });
+
+          if (potentialStudentRes.rowCount > 0) {
+            const matchedStudent = potentialStudentRes.rows[0];
+            const matchedName = normalizeText(matchedStudent.name);
+            const matchedEmail = normalizeText(matchedStudent.email);
+            const matchedPhone = normalizeField(matchedStudent.phone) || "";
+            const incomingPhone = phone || "";
+            const incomingName = normalizeText(fullName);
+
+            const exactSameStudent =
+              matchedName === incomingName &&
+              matchedEmail === email &&
+              matchedPhone === incomingPhone;
+
+            console.log("Two-field comparison details", {
+              incomingName,
+              incomingEmail: email,
+              incomingPhone,
+              matchedName,
+              matchedEmail,
+              matchedPhone,
+              exactSameStudent,
+            });
+
+            if (!exactSameStudent) {
+              const matchedStudentId = matchedStudent.id;
+              const duplicatePendingRes = await findDuplicatePendingConfirmation({
+                importedName: fullName,
+                importedEmail: email,
+                importedPhone: phone,
+                courseId,
+                beginDate,
+                completionDate,
+                status: normalizedStatus,
+                grade: normalizedGrade,
+                matchedStudentId,
+              });
+
+              if (duplicatePendingRes.rowCount > 0) {
+                skippedDuplicates += 1;
+                console.log("Skipping duplicate pending confirmation row", {
+                  matchedStudentId,
+                  courseId,
+                  beginDate,
+                  completionDate,
+                });
+                continue;
+              }
+
+              await pool.query(
+                `
+                INSERT INTO PendingStudentConfirmation
+                  (
+                    imported_name,
+                    imported_email,
+                    imported_phone,
+                    offering_title,
+                    course_id,
+                    begin_date,
+                    completion_date,
+                    status,
+                    grade,
+                    matched_student_id
+                  )
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+                `,
+                [
+                  fullName,
+                  email,
+                  phone,
+                  offeringTitle,
+                  courseId,
+                  beginDate,
+                  completionDate,
+                  normalizedStatus,
+                  normalizedGrade,
+                  matchedStudentId,
+                ]
+              );
+
+              pendingConfirmations += 1;
+              console.log("Pending confirmation created", {
+                fullName,
+                email,
+                phone,
+                matchedStudentId,
+                courseId,
+              });
+              continue;
+            }
+          }
+
+          const studentRes = await pool.query(
+            `
+            INSERT INTO Student (name, email, phone)
+            VALUES ($1, $2, $3)
+            ON CONFLICT (email) DO UPDATE
+            SET name = EXCLUDED.name,
+                phone = EXCLUDED.phone
+            RETURNING id
+            `,
+            [fullName, email, phone]
+          );
+
+          const studentId = studentRes.rows[0].id;
+          const insertHistoryRes = await insertCourseHistory({
             studentId,
             courseId,
             beginDate,
@@ -221,61 +505,7 @@ app.post("/upload-students", upload.single("file"), async (req, res) => {
             grade: normalizedGrade,
           });
 
-          // Skip only true duplicate enrollments:
-          // same student + same course + same dates + same status + same grade.
-          // This still allows the same student to take a different course.
-          const duplicateHistoryRes = await pool.query(
-            `
-            SELECT 1
-            FROM CourseHistory
-            WHERE student_id = $1
-              AND course_id = $2
-              AND begin_date IS NOT DISTINCT FROM $3
-              AND completion_date IS NOT DISTINCT FROM $4
-              AND status IS NOT DISTINCT FROM $5
-              AND grade IS NOT DISTINCT FROM $6
-            LIMIT 1
-            `,
-            [
-              studentId,
-              courseId,
-              beginDate,
-              completionDate,
-              normalizedStatus,
-              normalizedGrade,
-            ]
-          );
-
-          if (duplicateHistoryRes.rowCount > 0) {
-            console.log("Skipping duplicate CourseHistory row", {
-              studentId,
-              courseId,
-              beginDate,
-              completionDate,
-            });
-            skippedDuplicates += 1;
-            continue;
-          }
-
-          // Insert a new enrollment/history record only when it is not a duplicate.
-          const insertHistoryRes = await pool.query(
-            `
-INSERT INTO CourseHistory
-  (student_id, course_id, begin_date, completion_date, status, grade)
-VALUES ($1, $2, $3, $4, $5, $6)
-RETURNING student_id, course_id, begin_date, completion_date, status, grade
-            `,
-            [
-              studentId,
-              courseId,
-              beginDate,
-              completionDate,
-              normalizedStatus,
-              normalizedGrade,
-            ]
-          );
           insertedCount += 1;
-
           console.log("CourseHistory row inserted successfully", {
             insertedRow: insertHistoryRes.rows[0],
             insertedCount,
@@ -288,6 +518,7 @@ RETURNING student_id, course_id, begin_date, completion_date, status, grade
           processedRows: results.length,
           insertedRows: insertedCount,
           skippedDuplicates,
+          pendingConfirmations,
         });
       } catch (error) {
         console.error("Error processing /upload-students:", error);
@@ -296,35 +527,122 @@ RETURNING student_id, course_id, begin_date, completion_date, status, grade
     });
 });
 
-// app.delete("/students/:id", async (req, res) => {
-//   try {
-//     const studentId = req.params.id;
+app.post("/pending-confirmations/:id/merge", async (req, res) => {
+  try {
+    const pendingId = req.params.id;
+    const pendingRes = await pool.query(
+      `
+      SELECT *
+      FROM PendingStudentConfirmation
+      WHERE id = $1 AND resolution_status = 'pending'
+      LIMIT 1
+      `,
+      [pendingId]
+    );
 
-//     // 🔥 First delete course history (FK constraint)
-//     await pool.query(
-//       "DELETE FROM CourseHistory WHERE student_id = $1",
-//       [studentId]
-//     );
+    if (pendingRes.rowCount === 0) {
+      return res.status(404).json({ error: "Pending confirmation not found" });
+    }
 
-//     // 🔥 Then delete student
-//     const result = await pool.query(
-//       "DELETE FROM Student WHERE id = $1 RETURNING *",
-//       [studentId]
-//     );
+    const pending = pendingRes.rows[0];
+    const targetStudentId = pending.matched_student_id;
 
-//     if (result.rowCount === 0) {
-//       return res.status(404).json({ error: "Student not found" });
-//     }
+    if (!targetStudentId) {
+      return res.status(400).json({ error: "No matched student available to merge" });
+    }
 
-//     res.json({ message: "Student deleted successfully" });
+    const isDuplicate = await hasDuplicateCourseHistory({
+      studentId: targetStudentId,
+      courseId: pending.course_id,
+      beginDate: pending.begin_date,
+      completionDate: pending.completion_date,
+      status: pending.status,
+      grade: pending.grade,
+    });
 
-//   } catch (error) {
-//     res.status(500).json({ error: error.message });
-//   }
-// });
+    if (!isDuplicate) {
+      await insertCourseHistory({
+        studentId: targetStudentId,
+        courseId: pending.course_id,
+        beginDate: pending.begin_date,
+        completionDate: pending.completion_date,
+        status: pending.status,
+        grade: pending.grade,
+      });
+    }
+
+    await pool.query(
+      `
+      UPDATE PendingStudentConfirmation
+      SET resolution_status = 'merged'
+      WHERE id = $1
+      `,
+      [pendingId]
+    );
+
+    res.json({ message: "Pending confirmation merged successfully" });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post("/pending-confirmations/:id/create-student", async (req, res) => {
+  try {
+    const pendingId = req.params.id;
+    const pendingRes = await pool.query(
+      `
+      SELECT *
+      FROM PendingStudentConfirmation
+      WHERE id = $1 AND resolution_status = 'pending'
+      LIMIT 1
+      `,
+      [pendingId]
+    );
+
+    if (pendingRes.rowCount === 0) {
+      return res.status(404).json({ error: "Pending confirmation not found" });
+    }
+
+    const pending = pendingRes.rows[0];
+
+    const studentRes = await pool.query(
+      `
+      INSERT INTO Student (name, email, phone)
+      VALUES ($1, $2, $3)
+      RETURNING id
+      `,
+      [pending.imported_name, pending.imported_email, pending.imported_phone]
+    );
+
+    const studentId = studentRes.rows[0].id;
+
+    await insertCourseHistory({
+      studentId,
+      courseId: pending.course_id,
+      beginDate: pending.begin_date,
+      completionDate: pending.completion_date,
+      status: pending.status,
+      grade: pending.grade,
+    });
+
+    await pool.query(
+      `
+      UPDATE PendingStudentConfirmation
+      SET resolution_status = 'created_new'
+      WHERE id = $1
+      `,
+      [pendingId]
+    );
+
+    res.json({ message: "New student created from pending confirmation" });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
 
 app.delete("/students", async (req, res) => {
   try {
+    await pool.query("DELETE FROM PendingStudentConfirmation");
     await pool.query("DELETE FROM CourseHistory");
     const result = await pool.query("DELETE FROM Student");
 
@@ -336,3 +654,16 @@ app.delete("/students", async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
+
+const port = process.env.PORT || 3000;
+
+ensurePendingConfirmationTable()
+  .then(() => {
+    app.listen(port, () => {
+      console.log(`Server running on http://localhost:${port}`);
+    });
+  })
+  .catch((error) => {
+    console.error("Failed to initialize API:", error);
+    process.exit(1);
+  });

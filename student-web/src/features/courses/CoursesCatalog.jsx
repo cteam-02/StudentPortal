@@ -14,7 +14,12 @@ import "./CoursesCatalog.css";
 const API_BASE_URL = "http://localhost:3000";
 const pageSize = 10;
 
-function CoursesCatalog({ onOpenDashboard, onOpenStudents, onOpenCourseDetail }) {
+function CoursesCatalog({
+  onOpenDashboard,
+  onOpenStudents,
+  onOpenPending,
+  onOpenCourseDetail,
+}) {
   const [courses, setCourses] = useState([]);
   const [query, setQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
@@ -134,6 +139,7 @@ function CoursesCatalog({ onOpenDashboard, onOpenStudents, onOpenCourseDetail })
         onOpenDashboard={onOpenDashboard}
         onOpenStudents={onOpenStudents}
         onOpenCourses={() => {}}
+        onOpenPending={onOpenPending}
         searchPlaceholder="Search courses..."
       />
 

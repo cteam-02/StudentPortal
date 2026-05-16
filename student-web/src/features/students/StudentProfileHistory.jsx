@@ -13,6 +13,7 @@ function StudentProfileHistory({
   onOpenDashboard,
   onOpenStudents,
   onOpenCourses,
+  onOpenPending,
 }) {
   const displayName = student?.name || "Student";
   const displayEmail = student?.email || "No email available";
@@ -87,6 +88,7 @@ function StudentProfileHistory({
         onOpenDashboard={onOpenDashboard}
         onOpenStudents={onOpenStudents}
         onOpenCourses={onOpenCourses}
+        onOpenPending={onOpenPending}
         searchPlaceholder="Search students..."
       />
 
