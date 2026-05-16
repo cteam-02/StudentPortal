@@ -89,6 +89,30 @@ app.get("/students/:id/courses", async (req, res) => {
 });
 
 
+// Upload a CSV file and translate each row into:
+// 1. a Student record (matched first by email + full name)
+// 2. a CourseHistory record (matched by course title + enrollment details)
+//
+// Request:
+//   POST /upload-students
+//   Content-Type: multipart/form-data
+//   form field: file=<students.csv>
+//
+// Example CSV columns used by this API:
+//   Student First Name, Student Last Name, Student Email, Phone Number,
+//   Offering Title, Begin Date, Completion Date, Status, Grade
+//
+// Example row:
+//   John,Doe,john.doe@example.com,555-111-2222,EM385-1-1,
+//   4/22/22, 7:45:21 PM UTC,7/5/22, 5:06:46 PM UTC,Passed,94
+//
+// Response example:
+//   {
+//     message: "Students & courses imported successfully 🎉",
+//     processedRows: 10,
+//     insertedRows: 8,
+//     skippedDuplicates: 2
+//   }
 app.post("/upload-students", upload.single("file"), async (req, res) => {
   const results = [];
   let insertedCount = 0;
@@ -110,16 +134,15 @@ app.post("/upload-students", upload.single("file"), async (req, res) => {
         cleanRow[cleanKey] = row[key];
       });
 
-      console.log("CSV keys:", Object.keys(cleanRow));
-      console.log("Sample row:", cleanRow);
-
       results.push(cleanRow);
     })
     .on("end", async () => {
       try {
         for (const row of results) {
+          // Extract the fields this API cares about from the normalized CSV row.
           const offeringTitle = row["offering title"]?.trim();
           const email = row["student email"]?.toLowerCase().trim();
+          const fullName = `${row["student first name"] || ""} ${row["student last name"] || ""}`.trim();
           const beginDate = parseCsvDateTime(row["begin date"]);
           const completionDate = parseCsvDateTime(row["completion date"]);
 
@@ -136,22 +159,42 @@ app.post("/upload-students", upload.single("file"), async (req, res) => {
           console.log("Parsed begin date:", beginDate);
           console.log("Parsed completion date:", completionDate);
 
-          const studentRes = await pool.query(
+          // First try to find the same student by both email and full name.
+          // This is our duplicate-match rule for Student imports.
+          const existingStudentRes = await pool.query(
             `
-            INSERT INTO Student (name, email, phone)
-            VALUES ($1, $2, $3)
-            ON CONFLICT (email) DO UPDATE SET name = EXCLUDED.name
-            RETURNING id
+            SELECT id
+            FROM Student
+            WHERE LOWER(TRIM(email)) = LOWER(TRIM($1))
+              AND LOWER(TRIM(name)) = LOWER(TRIM($2))
+            LIMIT 1
             `,
-            [
-              `${row["student first name"] || ""} ${row["student last name"] || ""}`.trim(),
-              email,
-              row["phone number"],
-            ]
+            [email, fullName]
           );
 
-          const studentId = studentRes.rows[0].id;
+          let studentId;
 
+          if (existingStudentRes.rowCount > 0) {
+            studentId = existingStudentRes.rows[0].id;
+          } else {
+            // If the email already exists with a different name, PostgreSQL's
+            // unique email constraint still forces us to reuse that student row.
+            const studentRes = await pool.query(
+              `
+              INSERT INTO Student (name, email, phone)
+              VALUES ($1, $2, $3)
+              ON CONFLICT (email) DO UPDATE
+              SET name = EXCLUDED.name
+              RETURNING id
+              `,
+              [fullName, email, row["phone number"]]
+            );
+
+            studentId = studentRes.rows[0].id;
+          }
+
+          // Resolve the course by title. The CSV does not contain course_id,
+          // so we map "Offering Title" -> Course.id here.
           const courseRes = await pool.query(
             `
             SELECT id, title
@@ -178,6 +221,9 @@ app.post("/upload-students", upload.single("file"), async (req, res) => {
             grade: normalizedGrade,
           });
 
+          // Skip only true duplicate enrollments:
+          // same student + same course + same dates + same status + same grade.
+          // This still allows the same student to take a different course.
           const duplicateHistoryRes = await pool.query(
             `
             SELECT 1
@@ -211,11 +257,13 @@ app.post("/upload-students", upload.single("file"), async (req, res) => {
             continue;
           }
 
-          await pool.query(
+          // Insert a new enrollment/history record only when it is not a duplicate.
+          const insertHistoryRes = await pool.query(
             `
 INSERT INTO CourseHistory
   (student_id, course_id, begin_date, completion_date, status, grade)
 VALUES ($1, $2, $3, $4, $5, $6)
+RETURNING student_id, course_id, begin_date, completion_date, status, grade
             `,
             [
               studentId,
@@ -227,6 +275,12 @@ VALUES ($1, $2, $3, $4, $5, $6)
             ]
           );
           insertedCount += 1;
+
+          console.log("CourseHistory row inserted successfully", {
+            insertedRow: insertHistoryRes.rows[0],
+            insertedCount,
+            skippedDuplicates,
+          });
         }
 
         res.json({
@@ -236,6 +290,7 @@ VALUES ($1, $2, $3, $4, $5, $6)
           skippedDuplicates,
         });
       } catch (error) {
+        console.error("Error processing /upload-students:", error);
         res.status(500).json({ error: error.message });
       }
     });

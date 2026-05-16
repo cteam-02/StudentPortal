@@ -3,9 +3,8 @@ import {
   CalendarDays,
   ChevronLeft,
   ChevronRight,
-  Plus,
+  Search,
   SlidersHorizontal,
-  Upload,
 } from "lucide-react";
 import AppHeader from "../../app/components/AppHeader/AppHeader.jsx";
 import "./StudentDirectory.css";
@@ -171,17 +170,17 @@ function StudentDirectory({ onOpenDashboard, onOpenCourses, onViewProfile }) {
           </div>
         </section>
 
-        <div className="directory-toolbar" style={{ paddingTop: 10 }}>
-          <button type="button" className="directory-primary-btn">
-            <Plus size={16} />
-            <span>Add New Student</span>
-          </button>
-
-          <button type="button" className="directory-secondary-btn">
-            <Upload size={16} />
-            <span>Import Data</span>
-          </button>
-        </div>
+        <section className="directory-search-panel">
+          <label className="directory-page-search">
+            <Search size={16} />
+            <input
+              type="text"
+              placeholder="Search by name, email, or phone number"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+            />
+          </label>
+        </section>
 
         <section className="directory-filter-bar">
           <div className="directory-filters">

@@ -35,6 +35,10 @@ function App() {
     setCurrentView("course-detail");
   };
 
+  const clearFocusedStudent = () => {
+    setFocusedStudentId(null);
+  };
+
   const handleViewProfile = (student) => {
     setSelectedStudent(student);
     setFocusedStudentId(student.id);
@@ -102,6 +106,7 @@ function App() {
         onOpenCourses={openCourses}
         onOpenProfile={openProfile}
         focusedStudentId={focusedStudentId}
+        onFocusedStudentHandled={clearFocusedStudent}
       />
     );
   }

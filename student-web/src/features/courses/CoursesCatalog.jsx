@@ -3,9 +3,10 @@ import {
   BookOpen,
   ChevronLeft,
   ChevronRight,
+  Eye,
   GraduationCap,
   Plus,
-  SquarePen,
+  Search,
 } from "lucide-react";
 import AppHeader from "../../app/components/AppHeader/AppHeader.jsx";
 import "./CoursesCatalog.css";
@@ -101,12 +102,7 @@ function CoursesCatalog({ onOpenDashboard, onOpenStudents, onOpenCourseDetail })
     if (!normalized) return courses;
 
     return courses.filter((course) => {
-      return (
-        String(course.id).includes(normalized) ||
-        course.title?.toLowerCase().includes(normalized) ||
-        getCourseDescription(course).toLowerCase().includes(normalized) ||
-        getInstructorName(course).toLowerCase().includes(normalized)
-      );
+      return course.title?.toLowerCase().includes(normalized);
     });
   }, [courses, query]);
 
@@ -139,8 +135,6 @@ function CoursesCatalog({ onOpenDashboard, onOpenStudents, onOpenCourseDetail })
         onOpenStudents={onOpenStudents}
         onOpenCourses={() => {}}
         searchPlaceholder="Search courses..."
-        searchValue={query}
-        onSearchChange={setQuery}
       />
 
       <main className="catalog-main">
@@ -157,6 +151,18 @@ function CoursesCatalog({ onOpenDashboard, onOpenStudents, onOpenCourseDetail })
             <Plus size={16} />
             <span>Add New Course</span>
           </button>
+        </section>
+
+        <section className="catalog-search-panel">
+          <label className="catalog-page-search">
+            <Search size={16} />
+            <input
+              type="text"
+              placeholder="Search by course name"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+            />
+          </label>
         </section>
 
         <section className="catalog-table-card">
@@ -214,8 +220,8 @@ function CoursesCatalog({ onOpenDashboard, onOpenStudents, onOpenCourseDetail })
                       onOpenCourseDetail?.(course);
                     }}
                   >
-                    <SquarePen size={14} />
-                    <span>Edit</span>
+                    <Eye size={14} />
+                    <span>Detail</span>
                   </button>
                 </article>
               ))

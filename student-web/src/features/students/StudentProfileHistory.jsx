@@ -1,10 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  Download,
-  Filter,
-  PlusCircle,
-  SquarePen,
-  GraduationCap
+  GraduationCap,
+  UserRound
 } from "lucide-react";
 import AppHeader from "../../app/components/AppHeader/AppHeader.jsx";
 import "./StudentProfileHistory.css";
@@ -17,9 +14,9 @@ function StudentProfileHistory({
   onOpenStudents,
   onOpenCourses,
 }) {
-  const displayName = student?.name || "Johnathan Doe";
-  const displayEmail = student?.email || "john.doe@kugan.edu";
-  const displayId = student?.id ? String(student.id).padStart(6, "0") : "128495";
+  const displayName = student?.name || "Student";
+  const displayEmail = student?.email || "No email available";
+  const displayId = student?.id ? String(student.id).padStart(6, "0") : "Unavailable";
   const [courses, setCourses] = useState([]);
 
   useEffect(() => {
@@ -48,40 +45,40 @@ function StudentProfileHistory({
     return courses.map((course, index) => {
       const status = String(course.status || "").toLowerCase();
       let statusTone = "blue";
-      let actionType = "download";
-      let action = "Certificate";
 
       if (status.includes("pass") || status.includes("complete")) {
         statusTone = "green";
       } else if (status.includes("expire")) {
         statusTone = "red";
-        action = "Renew";
-        actionType = "renew";
       } else if (status.includes("active") || status.includes("progress")) {
         statusTone = "blue";
-        action = "Locked";
-        actionType = "locked";
       } else if (status.includes("pending")) {
         statusTone = "blue";
-        action = "Locked";
-        actionType = "locked";
       }
 
       return {
         courseName: course.course_title || `Course ${index + 1}`,
-        courseId: `TRN-${String(student?.id || 0).padStart(4, "0")}-${String(
-          index + 1
-        ).padStart(3, "0")}`,
         startDate: formatDate(course.begin_date),
         completion: formatDate(course.completion_date),
-        status: course.status || "Active",
+        status: course.status || "Status unavailable",
         statusTone,
-        grade: course.grade || "In progress",
-        action,
-        actionType,
+        grade: course.grade || "N/A",
       };
     });
-  }, [courses, student?.id]);
+  }, [courses]);
+
+  const completedCourses = useMemo(() => {
+    return courses.filter((course) => {
+      const status = String(course.status || "").toLowerCase();
+      return (
+        status.includes("complete") ||
+        status.includes("completed") ||
+        status.includes("pass") ||
+        status.includes("finished") ||
+        Boolean(course.completion_date)
+      );
+    }).length;
+  }, [courses]);
 
   return (
     <div className="profile-shell">
@@ -109,49 +106,27 @@ function StudentProfileHistory({
         <section className="profile-card">
           <div className="profile-card-main">
             <div className="profile-photo-wrap">
-              <div className="profile-photo" />
-              <span className="profile-online-dot" />
+              <div className="profile-photo">
+                <div className="profile-photo-placeholder">
+                  <UserRound size={28} />
+                </div>
+              </div>
             </div>
 
             <div className="profile-summary">
               <div className="profile-name-row">
                 <h1>{displayName}</h1>
-                <span className="profile-badge">Premium</span>
               </div>
 
               <p className="profile-meta">
                 Student ID: {displayId} • {displayEmail}
               </p>
 
-              <div className="profile-tags">
-                <span className="profile-pill is-green">Active</span>
-                <span className="profile-pill">Undergraduate</span>
-                <span className="profile-pill">Dean&apos;s List 2024</span>
+              <div className="profile-summary-stats">
+                <span>{courses.length} courses</span>
+                <span>{completedCourses} completed</span>
               </div>
             </div>
-
-            <div className="profile-actions">
-              <button type="button" className="profile-secondary-btn">
-                <SquarePen size={15} />
-                <span>Edit Profile</span>
-              </button>
-              <button type="button" className="profile-primary-btn">
-                <PlusCircle size={15} />
-                <span>Add Course</span>
-              </button>
-            </div>
-          </div>
-
-          <div className="profile-tabs">
-            <button type="button" className="profile-tab">
-              Personal Details
-            </button>
-            <button type="button" className="profile-tab is-active">
-              Course &amp; Training History
-            </button>
-            <button type="button" className="profile-tab">
-              Documents
-            </button>
           </div>
         </section>
 
@@ -160,15 +135,6 @@ function StudentProfileHistory({
             <div className="profile-history-title">
               <GraduationCap size={16} />
               <h2>Training History</h2>
-            </div>
-
-            <div className="profile-history-tools">
-              <button type="button" className="profile-tool-btn">
-                <Filter size={16} />
-              </button>
-              <button type="button" className="profile-tool-btn">
-                <Download size={16} />
-              </button>
             </div>
           </div>
 
@@ -179,7 +145,6 @@ function StudentProfileHistory({
               <span>Completion</span>
               <span>Status</span>
               <span>Grade %</span>
-              <span>Actions</span>
             </div>
 
             <div className="profile-history-body">
@@ -189,10 +154,9 @@ function StudentProfileHistory({
                 </div>
               ) : (
                 trainingHistory.map((item) => (
-                  <article key={item.courseId} className="profile-history-row">
+                  <article key={`${item.courseName}-${item.startDate}-${item.completion}`} className="profile-history-row">
                     <div className="profile-course-cell">
                       <strong>{item.courseName}</strong>
-                      <span>ID: {item.courseId}</span>
                     </div>
                     <div>{item.startDate}</div>
                     <div>{item.completion}</div>
@@ -202,19 +166,6 @@ function StudentProfileHistory({
                       </span>
                     </div>
                     <div className="profile-grade">{item.grade}</div>
-                    <div>
-                      <button
-                        type="button"
-                        className={`profile-action-link is-${item.actionType}`}
-                      >
-                        {item.actionType === "download" && (
-                          <Download size={14} />
-                        )}
-                        {item.actionType === "locked" && <Lock size={14} />}
-                        {item.actionType === "renew" && <RefreshCw size={14} />}
-                        <span>{item.action}</span>
-                      </button>
-                    </div>
                   </article>
                 ))
               )}
@@ -223,25 +174,9 @@ function StudentProfileHistory({
 
           <div className="profile-history-footer">
             <p>Showing {trainingHistory.length} courses</p>
-            <div className="profile-history-pagination">
-              <button type="button" className="profile-page-btn">
-                Previous
-              </button>
-              <button type="button" className="profile-page-btn is-active">
-                Next
-              </button>
-            </div>
           </div>
         </section>
       </main>
-
-      <footer className="profile-footer">
-        <p>&copy; 2024 Kugan &amp; Associates. All rights reserved.</p>
-        <div>
-          <a href="#">Privacy Policy</a>
-          <a href="#">Terms of Service</a>
-        </div>
-      </footer>
     </div>
   );
 }

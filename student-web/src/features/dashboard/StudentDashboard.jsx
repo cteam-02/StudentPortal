@@ -19,6 +19,7 @@ function StudentDashboard({
   onOpenCourses,
   onOpenProfile,
   focusedStudentId,
+  onFocusedStudentHandled,
 }) {
   const [students, setStudents] = useState([]);
   const [selectedStudent, setSelectedStudent] = useState(null);
@@ -47,8 +48,9 @@ function StudentDashboard({
     const matchedStudent = students.find((student) => student.id === focusedStudentId);
     if (matchedStudent) {
       loadCourses(matchedStudent);
+      onFocusedStudentHandled?.();
     }
-  }, [focusedStudentId, students]);
+  }, [focusedStudentId, students, onFocusedStudentHandled]);
 
   const loadCourses = async (student) => {
     try {
@@ -78,16 +80,21 @@ function StudentDashboard({
         body: formData,
       });
 
+      const result = await response.json();
+
       if (!response.ok) {
-        throw new Error("Upload failed");
+        throw new Error(result.error || "Upload failed");
       }
 
-      await response.json();
       await fetchStudents();
-      toast.success("Students uploaded successfully");
+      toast.success(
+        `Imported ${result.insertedRows ?? 0} rows, skipped ${
+          result.skippedDuplicates ?? 0
+        } duplicates`
+      );
     } catch (error) {
       console.error("Error uploading students:", error);
-      toast.error("Failed to upload students");
+      toast.error(error.message || "Failed to upload students");
     } finally {
       setLoading(false);
       event.target.value = "";
