@@ -67,15 +67,17 @@ function AppHeader({
       </nav>
 
       <div className="app-header-actions">
-        <label className="app-header-search">
-          <Search size={16} />
-          <input
-            type="text"
-            placeholder={searchPlaceholder}
-            value={searchValue}
-            onChange={(event) => onSearchChange?.(event.target.value)}
-          />
-        </label>
+        {onSearchChange && (
+          <label className="app-header-search">
+            <Search size={16} />
+            <input
+              type="text"
+              placeholder={searchPlaceholder}
+              value={searchValue}
+              onChange={(event) => onSearchChange(event.target.value)}
+            />
+          </label>
+        )}
 
         <div className="app-header-user">
           <div className="app-header-user-avatar">

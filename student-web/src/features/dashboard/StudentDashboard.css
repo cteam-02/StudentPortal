@@ -456,6 +456,30 @@
   font-weight: 800;
 }
 
+.dashboard-profile-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 20px;
+  height: 38px;
+  padding: 0 20px;
+  border: 0;
+  border-radius: 9px;
+  background: linear-gradient(180deg, #2563eb 0%, #1d4ed8 100%);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  width: 100%;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(29, 78, 216, 0.22);
+  transition: opacity 0.15s ease;
+}
+
+.dashboard-profile-btn:hover {
+  opacity: 0.9;
+}
+
 .dashboard-course-section {
   margin-top: 22px;
 }

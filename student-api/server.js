@@ -257,6 +257,25 @@ app.get("/", (req, res) => {
   res.send("Student API is running");
 });
 
+app.get("/stats", async (req, res) => {
+  try {
+    const [studentsRes, enrollmentsRes, pendingRes, coursesRes] = await Promise.all([
+      pool.query("SELECT COUNT(*) FROM Student"),
+      pool.query("SELECT COUNT(*) FROM CourseHistory"),
+      pool.query("SELECT COUNT(*) FROM PendingStudentConfirmation WHERE resolution_status = 'pending'"),
+      pool.query("SELECT COUNT(*) FROM Course"),
+    ]);
+    res.json({
+      totalStudents: parseInt(studentsRes.rows[0].count),
+      totalEnrollments: parseInt(enrollmentsRes.rows[0].count),
+      pendingConfirmations: parseInt(pendingRes.rows[0].count),
+      totalCourses: parseInt(coursesRes.rows[0].count),
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.post("/auth/login", async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) {
@@ -549,54 +568,28 @@ app.post("/upload-students", upload.single("file"), async (req, res) => {
 
             if (duplicatePendingRes.rowCount > 0) {
               skippedDuplicates += 1;
-              console.log("Skipping duplicate pending confirmation row", {
-                matchedStudentId,
-                courseId,
-                beginDate,
-                completionDate,
-              });
+              console.log(`[SKIP] Duplicate pending confirmation — student: "${fullName}" (${email}), course: "${offeringTitle}", matchedStudentId: ${matchedStudentId}`);
               continue;
             }
 
-              if (duplicatePendingRes.rowCount > 0) {
-                skippedDuplicates += 1;
-                console.log(`[SKIP] Duplicate pending confirmation — student: "${fullName}" (${email}), course: "${offeringTitle}", matchedStudentId: ${matchedStudentId}`);
-                continue;
-              }
-
-              await pool.query(
-                `
-                INSERT INTO PendingStudentConfirmation
-                  (
-                    imported_name,
-                    imported_email,
-                    imported_phone,
-                    offering_title,
-                    course_id,
-                    begin_date,
-                    completion_date,
-                    status,
-                    grade,
-                    matched_student_id
-                  )
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-                `,
-                [
-                  fullName,
-                  email,
-                  phone,
-                  offeringTitle,
-                  courseId,
-                  beginDate,
-                  completionDate,
-                  normalizedStatus,
-                  normalizedGrade,
-                  matchedStudentId,
-                ]
-              );
-
-              pendingConfirmations += 1;
-              console.log("Pending confirmation created", {
+            await pool.query(
+              `
+              INSERT INTO PendingStudentConfirmation
+                (
+                  imported_name,
+                  imported_email,
+                  imported_phone,
+                  offering_title,
+                  course_id,
+                  begin_date,
+                  completion_date,
+                  status,
+                  grade,
+                  matched_student_id
+                )
+              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+              `,
+              [
                 fullName,
                 email,
                 phone,
