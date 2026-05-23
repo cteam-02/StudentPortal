@@ -82,7 +82,7 @@
 
 .app-header-user {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 10px;
 }
 
@@ -134,6 +134,11 @@
   letter-spacing: 0.04em;
   background: #e8eef8;
   color: #5a7ab0;
+}
+
+/* Override the generic span rule which would otherwise win on specificity */
+.app-header-user .app-header-role-badge {
+  font-size: 9px;
 }
 
 .app-header-role-badge.is-super {
