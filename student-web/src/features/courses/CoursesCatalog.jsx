@@ -15,9 +15,12 @@ const API_BASE_URL = "http://localhost:3000";
 const pageSize = 10;
 
 function CoursesCatalog({
+  currentUser,
   onOpenDashboard,
   onOpenStudents,
   onOpenPending,
+  onOpenUsers,
+  onLogout,
   onOpenCourseDetail,
 }) {
   const [courses, setCourses] = useState([]);
@@ -136,10 +139,13 @@ function CoursesCatalog({
     <div className="catalog-shell">
       <AppHeader
         currentSection="courses"
+        currentUser={currentUser}
         onOpenDashboard={onOpenDashboard}
         onOpenStudents={onOpenStudents}
         onOpenCourses={() => {}}
         onOpenPending={onOpenPending}
+        onOpenUsers={onOpenUsers}
+        onLogout={onLogout}
         searchPlaceholder="Search courses..."
       />
 

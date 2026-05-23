@@ -167,6 +167,17 @@
   cursor: pointer;
 }
 
+.login-error {
+  margin: 0;
+  padding: 9px 12px;
+  border-radius: 7px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #dc2626;
+  font-size: 12px;
+  font-weight: 600;
+}
+
 .login-options {
   display: flex;
   align-items: center;

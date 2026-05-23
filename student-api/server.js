@@ -5,6 +5,7 @@ require("dotenv").config();
 const multer = require("multer");
 const csv = require("csv-parser");
 const fs = require("fs");
+const bcrypt = require("bcrypt");
 
 const app = express();
 app.use(cors());
@@ -30,6 +31,33 @@ const normalizeField = (value) => {
 };
 
 const normalizeText = (value) => normalizeField(value)?.toLowerCase() || null;
+
+async function ensurePortalUserTable() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS PortalUser (
+      id SERIAL PRIMARY KEY,
+      name TEXT NOT NULL,
+      email TEXT NOT NULL UNIQUE,
+      password_hash TEXT NOT NULL,
+      role TEXT NOT NULL DEFAULT 'admin',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+
+  const existing = await pool.query(
+    `SELECT id FROM PortalUser WHERE LOWER(email) = $1 LIMIT 1`,
+    ["cteam02@kugan.com"]
+  );
+
+  if (existing.rowCount === 0) {
+    const hash = await bcrypt.hash("Admin@2024", 10);
+    await pool.query(
+      `INSERT INTO PortalUser (name, email, password_hash, role) VALUES ($1, $2, $3, $4)`,
+      ["Super Admin", "cteam02@kugan.com", hash, "super_admin"]
+    );
+    console.log("Super admin seeded: cteam02@kugan.com / Admin@2024");
+  }
+}
 
 async function ensurePendingConfirmationTable() {
   await pool.query(`
@@ -187,6 +215,79 @@ async function findDuplicatePendingConfirmation({
 
 app.get("/", (req, res) => {
   res.send("Student API is running");
+});
+
+app.post("/auth/login", async (req, res) => {
+  const { email, password } = req.body;
+  if (!email || !password) {
+    return res.status(400).json({ error: "Email and password are required" });
+  }
+  try {
+    const result = await pool.query(
+      `SELECT id, name, email, role, password_hash FROM PortalUser WHERE LOWER(email) = LOWER($1) LIMIT 1`,
+      [email]
+    );
+    if (result.rowCount === 0) {
+      return res.status(401).json({ error: "Invalid credentials" });
+    }
+    const user = result.rows[0];
+    const match = await bcrypt.compare(password, user.password_hash);
+    if (!match) {
+      return res.status(401).json({ error: "Invalid credentials" });
+    }
+    res.json({ id: user.id, name: user.name, email: user.email, role: user.role });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get("/auth/users", async (req, res) => {
+  const requesterId = req.headers["x-user-id"];
+  try {
+    const authCheck = await pool.query(
+      `SELECT role FROM PortalUser WHERE id = $1 LIMIT 1`,
+      [requesterId]
+    );
+    if (authCheck.rowCount === 0 || authCheck.rows[0].role !== "super_admin") {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+    const result = await pool.query(
+      `SELECT id, name, email, role, created_at FROM PortalUser ORDER BY id`
+    );
+    res.json(result.rows);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post("/auth/users", async (req, res) => {
+  const requesterId = req.headers["x-user-id"];
+  const { name, email, password, role } = req.body;
+  if (!name || !email || !password) {
+    return res.status(400).json({ error: "Name, email, and password are required" });
+  }
+  try {
+    const authCheck = await pool.query(
+      `SELECT role FROM PortalUser WHERE id = $1 LIMIT 1`,
+      [requesterId]
+    );
+    if (authCheck.rowCount === 0 || authCheck.rows[0].role !== "super_admin") {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+    const hash = await bcrypt.hash(password, 10);
+    const result = await pool.query(
+      `INSERT INTO PortalUser (name, email, password_hash, role)
+       VALUES ($1, $2, $3, $4)
+       RETURNING id, name, email, role, created_at`,
+      [name, email, hash, role || "admin"]
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    if (error.code === "23505") {
+      return res.status(409).json({ error: "A user with that email already exists" });
+    }
+    res.status(500).json({ error: error.message });
+  }
 });
 
 app.get("/students", async (req, res) => {
@@ -657,7 +758,7 @@ app.delete("/students", async (req, res) => {
 
 const port = process.env.PORT || 3000;
 
-ensurePendingConfirmationTable()
+Promise.all([ensurePendingConfirmationTable(), ensurePortalUserTable()])
   .then(() => {
     app.listen(port, () => {
       console.log(`Server running on http://localhost:${port}`);
