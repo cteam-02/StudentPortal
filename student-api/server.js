@@ -421,6 +421,7 @@ app.get("/pending-confirmations", async (req, res) => {
 app.post("/upload-students", upload.single("file"), async (req, res) => {
   const results = [];
   let insertedCount = 0;
+  let newStudentsCount = 0;
   let skippedDuplicates = 0;
   let pendingConfirmations = 0;
 
@@ -496,12 +497,7 @@ app.post("/upload-students", upload.single("file"), async (req, res) => {
 
             if (isDuplicate) {
               skippedDuplicates += 1;
-              console.log("Skipping duplicate CourseHistory row", {
-                studentId,
-                courseId,
-                beginDate,
-                completionDate,
-              });
+              console.log(`[SKIP] Duplicate course history — student: "${fullName}" (${email}), course: "${offeringTitle}", studentId: ${studentId}`);
               continue;
             }
 
@@ -562,24 +558,45 @@ app.post("/upload-students", upload.single("file"), async (req, res) => {
               continue;
             }
 
-            await pool.query(
-              `
-              INSERT INTO PendingStudentConfirmation
-                (
-                  imported_name,
-                  imported_email,
-                  imported_phone,
-                  offering_title,
-                  course_id,
-                  begin_date,
-                  completion_date,
-                  status,
-                  grade,
-                  matched_student_id
-                )
-              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-              `,
-              [
+              if (duplicatePendingRes.rowCount > 0) {
+                skippedDuplicates += 1;
+                console.log(`[SKIP] Duplicate pending confirmation — student: "${fullName}" (${email}), course: "${offeringTitle}", matchedStudentId: ${matchedStudentId}`);
+                continue;
+              }
+
+              await pool.query(
+                `
+                INSERT INTO PendingStudentConfirmation
+                  (
+                    imported_name,
+                    imported_email,
+                    imported_phone,
+                    offering_title,
+                    course_id,
+                    begin_date,
+                    completion_date,
+                    status,
+                    grade,
+                    matched_student_id
+                  )
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+                `,
+                [
+                  fullName,
+                  email,
+                  phone,
+                  offeringTitle,
+                  courseId,
+                  beginDate,
+                  completionDate,
+                  normalizedStatus,
+                  normalizedGrade,
+                  matchedStudentId,
+                ]
+              );
+
+              pendingConfirmations += 1;
+              console.log("Pending confirmation created", {
                 fullName,
                 email,
                 phone,
@@ -604,6 +621,12 @@ app.post("/upload-students", upload.single("file"), async (req, res) => {
             continue;
           }
 
+          const existingCheck = await pool.query(
+            `SELECT id FROM Student WHERE LOWER(TRIM(email)) = LOWER(TRIM($1)) LIMIT 1`,
+            [email]
+          );
+          const isNewStudent = existingCheck.rowCount === 0;
+
           const studentRes = await pool.query(
             `
             INSERT INTO Student (name, email, phone)
@@ -626,23 +649,21 @@ app.post("/upload-students", upload.single("file"), async (req, res) => {
             grade: normalizedGrade,
           });
 
+          if (isNewStudent) newStudentsCount += 1;
           insertedCount += 1;
-          console.log("CourseHistory row inserted successfully", {
-            insertedRow: insertHistoryRes.rows[0],
-            insertedCount,
-            skippedDuplicates,
-          });
+          console.log(`[NEW] Student: "${fullName}" (${email}), course: "${offeringTitle}" — newStudents: ${newStudentsCount}, totalCourseRecords: ${insertedCount}`);
         }
 
         const requesterId = req.headers["x-user-id"];
         await logActivity(
           requesterId || null,
           "CSV_IMPORT",
-          `Imported ${insertedCount} rows, skipped ${skippedDuplicates} duplicates, ${pendingConfirmations} pending confirmations (${results.length} total rows processed)`
+          `Imported ${newStudentsCount} new students, ${insertedCount} course records, skipped ${skippedDuplicates} duplicates, ${pendingConfirmations} pending confirmations (${results.length} total rows processed)`
         );
         res.json({
           message: "Students & courses imported successfully 🎉",
           processedRows: results.length,
+          newStudents: newStudentsCount,
           insertedRows: insertedCount,
           skippedDuplicates,
           pendingConfirmations,
