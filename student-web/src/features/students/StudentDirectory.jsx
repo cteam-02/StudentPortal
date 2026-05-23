@@ -13,9 +13,12 @@ const API_BASE_URL = "http://localhost:3000";
 const pageSize = 10;
 
 function StudentDirectory({
+  currentUser,
   onOpenDashboard,
   onOpenCourses,
   onOpenPending,
+  onOpenUsers,
+  onLogout,
   onViewProfile,
 }) {
   const [students, setStudents] = useState([]);
@@ -151,10 +154,13 @@ function StudentDirectory({
     <div className="directory-shell">
       <AppHeader
         currentSection="students"
+        currentUser={currentUser}
         onOpenDashboard={onOpenDashboard}
         onOpenStudents={() => {}}
         onOpenCourses={onOpenCourses}
         onOpenPending={onOpenPending}
+        onOpenUsers={onOpenUsers}
+        onLogout={onLogout}
         searchPlaceholder="Search by name, email, or phone"
         searchValue={query}
         onSearchChange={setQuery}

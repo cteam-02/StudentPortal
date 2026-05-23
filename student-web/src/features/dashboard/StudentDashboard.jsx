@@ -15,9 +15,12 @@ import "./StudentDashboard.css";
 const API_BASE_URL = "http://localhost:3000";
 
 function StudentDashboard({
+  currentUser,
   onOpenStudents,
   onOpenCourses,
   onOpenPending,
+  onOpenUsers,
+  onLogout,
   onOpenProfile,
   focusedStudentId,
   onFocusedStudentHandled,
@@ -160,10 +163,13 @@ function StudentDashboard({
       <ToastContainer position="top-right" autoClose={3000} />
       <AppHeader
         currentSection="dashboard"
+        currentUser={currentUser}
         onOpenDashboard={() => {}}
         onOpenStudents={onOpenStudents}
         onOpenCourses={onOpenCourses}
         onOpenPending={onOpenPending}
+        onOpenUsers={onOpenUsers}
+        onLogout={onLogout}
         searchPlaceholder="Search students, email, phone..."
         searchValue={searchQuery}
         onSearchChange={setSearchQuery}

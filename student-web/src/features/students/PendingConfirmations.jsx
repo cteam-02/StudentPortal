@@ -8,9 +8,12 @@ import "./PendingConfirmations.css";
 const API_BASE_URL = "http://localhost:3000";
 
 function PendingConfirmations({
+  currentUser,
   onOpenDashboard,
   onOpenStudents,
   onOpenCourses,
+  onOpenUsers,
+  onLogout,
   onViewProfile,
 }) {
   const [query, setQuery] = useState("");
@@ -101,10 +104,13 @@ function PendingConfirmations({
       <ToastContainer position="top-right" autoClose={3000} />
       <AppHeader
         currentSection="pending"
+        currentUser={currentUser}
         onOpenDashboard={onOpenDashboard}
         onOpenStudents={onOpenStudents}
         onOpenCourses={onOpenCourses}
         onOpenPending={() => {}}
+        onOpenUsers={onOpenUsers}
+        onLogout={onLogout}
         searchPlaceholder="Search pending confirmations..."
         searchValue={query}
         onSearchChange={setQuery}

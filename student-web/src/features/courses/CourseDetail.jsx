@@ -3,11 +3,14 @@ import AppHeader from "../../app/components/AppHeader/AppHeader.jsx";
 import "./CourseDetail.css";
 
 function CourseDetail({
+  currentUser,
   course,
   onOpenDashboard,
   onOpenStudents,
   onOpenCourses,
   onOpenPending,
+  onOpenUsers,
+  onLogout,
 }) {
   const title = course?.title || "Untitled course";
   const descriptionHtml =
@@ -30,10 +33,13 @@ function CourseDetail({
     <div className="course-detail-shell">
       <AppHeader
         currentSection="courses"
+        currentUser={currentUser}
         onOpenDashboard={onOpenDashboard}
         onOpenStudents={onOpenStudents}
         onOpenCourses={onOpenCourses}
         onOpenPending={onOpenPending}
+        onOpenUsers={onOpenUsers}
+        onLogout={onLogout}
         searchPlaceholder="Search courses..."
       />
 
