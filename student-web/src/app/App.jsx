@@ -15,8 +15,21 @@ import CoursesCatalog from "../features/courses/CoursesCatalog.jsx";
 import CourseDetail from "../features/courses/CourseDetail.jsx";
 import UserManagement from "../features/users/UserManagement.jsx";
 
+const SESSION_KEY = "portal_user";
+
+function restoreUser() {
+  try {
+    const raw =
+      localStorage.getItem(SESSION_KEY) ||
+      sessionStorage.getItem(SESSION_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
 function App() {
-  const [currentUser, setCurrentUser] = useState(null);
+  const [currentUser, setCurrentUser] = useState(() => restoreUser());
   const isLoggedIn = Boolean(currentUser);
   const [focusedStudentId, setFocusedStudentId] = useState(null);
   const [selectedStudent, setSelectedStudent] = useState(null);
@@ -32,13 +45,17 @@ function App() {
     return location.state?.course || selectedCourse;
   }, [location.state, selectedCourse]);
 
-  const handleLoginSuccess = (user) => {
+  const handleLoginSuccess = (user, remember) => {
     setCurrentUser(user);
+    const storage = remember ? localStorage : sessionStorage;
+    storage.setItem(SESSION_KEY, JSON.stringify(user));
     navigate("/dashboard", { replace: true });
   };
 
   const handleLogout = () => {
     setCurrentUser(null);
+    localStorage.removeItem(SESSION_KEY);
+    sessionStorage.removeItem(SESSION_KEY);
     navigate("/login", { replace: true });
   };
 
