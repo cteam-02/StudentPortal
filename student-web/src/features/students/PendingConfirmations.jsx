@@ -112,9 +112,6 @@ function PendingConfirmations({
         onOpenPending={() => {}}
         onOpenUsers={onOpenUsers}
         onLogout={onLogout}
-        searchPlaceholder="Search pending confirmations..."
-        searchValue={query}
-        onSearchChange={setQuery}
       />
 
       <main className="pending-main">

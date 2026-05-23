@@ -146,7 +146,6 @@ function CoursesCatalog({
         onOpenPending={onOpenPending}
         onOpenUsers={onOpenUsers}
         onLogout={onLogout}
-        searchPlaceholder="Search courses..."
       />
 
       <main className="catalog-main">
