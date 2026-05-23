@@ -304,6 +304,149 @@
   color: #6d28d9;
 }
 
+/* ── Tabs ───────────────────────────────────────────── */
+.um-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 2px solid #e8eef8;
+  margin-bottom: 4px;
+}
+
+.um-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 16px;
+  border: 0;
+  background: transparent;
+  color: #7b8aa6;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  border-radius: 6px 6px 0 0;
+  transition: color 0.15s ease;
+}
+
+.um-tab:hover {
+  color: #3b4a63;
+  background: #f4f7fc;
+}
+
+.um-tab.is-active {
+  color: #7c3aed;
+  border-bottom-color: #7c3aed;
+}
+
+/* ── Tab toolbar ────────────────────────────────────── */
+.um-tab-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 12px 0 4px;
+}
+
+.um-log-count {
+  margin-right: auto;
+  font-size: 12px;
+  font-weight: 600;
+  color: #94a3b8;
+}
+
+.um-refresh-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 7px;
+  background: transparent;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.um-refresh-btn:hover {
+  background: #f1f5f9;
+}
+
+.um-refresh-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+@keyframes um-spin {
+  to { transform: rotate(360deg); }
+}
+
+.um-spin {
+  animation: um-spin 0.7s linear infinite;
+}
+
+/* ── Log table ──────────────────────────────────────── */
+.um-log-table th:nth-child(1) { width: 160px; }
+.um-log-table th:nth-child(3) { width: 150px; }
+
+.um-log-time span {
+  font-size: 12px;
+  color: #94a3b8;
+  font-variant-numeric: tabular-nums;
+}
+
+.um-log-username {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: #1d293f;
+}
+
+.um-log-useremail {
+  display: block;
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.um-log-unknown {
+  font-size: 12px;
+  color: #cbd5e1;
+  font-style: italic;
+}
+
+.um-log-details {
+  font-size: 12px;
+  color: #64748b;
+  max-width: 340px;
+}
+
+.um-avatar-sm {
+  width: 26px !important;
+  height: 26px !important;
+  font-size: 10px !important;
+}
+
+/* ── Action badges ──────────────────────────────────── */
+.um-action-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 9px;
+  border-radius: 5px;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.um-action-green  { background: #dcfce7; color: #15803d; }
+.um-action-red    { background: #fee2e2; color: #dc2626; }
+.um-action-blue   { background: #dbeafe; color: #1d4ed8; }
+.um-action-purple { background: #ede9fe; color: #6d28d9; }
+.um-action-teal   { background: #ccfbf1; color: #0f766e; }
+.um-action-grey   { background: #f1f5f9; color: #475569; }
+
 /* Forbidden / loading states */
 .um-forbidden {
   display: flex;
