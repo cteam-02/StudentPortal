@@ -534,41 +534,29 @@ app.post("/upload-students", upload.single("file"), async (req, res) => {
           });
 
           if (potentialStudentRes.rowCount > 0) {
-            const matchedStudent = potentialStudentRes.rows[0];
-            const matchedName = normalizeText(matchedStudent.name);
-            const matchedEmail = normalizeText(matchedStudent.email);
-            const matchedPhone = normalizeField(matchedStudent.phone) || "";
-            const incomingPhone = phone || "";
-            const incomingName = normalizeText(fullName);
-
-            const exactSameStudent =
-              matchedName === incomingName &&
-              matchedEmail === email &&
-              matchedPhone === incomingPhone;
-
-            console.log("Two-field comparison details", {
-              incomingName,
-              incomingEmail: email,
-              incomingPhone,
-              matchedName,
-              matchedEmail,
-              matchedPhone,
-              exactSameStudent,
+            const matchedStudentId = potentialStudentRes.rows[0].id;
+            const duplicatePendingRes = await findDuplicatePendingConfirmation({
+              importedName: fullName,
+              importedEmail: email,
+              importedPhone: phone,
+              courseId,
+              beginDate,
+              completionDate,
+              status: normalizedStatus,
+              grade: normalizedGrade,
+              matchedStudentId,
             });
 
-            if (!exactSameStudent) {
-              const matchedStudentId = matchedStudent.id;
-              const duplicatePendingRes = await findDuplicatePendingConfirmation({
-                importedName: fullName,
-                importedEmail: email,
-                importedPhone: phone,
+            if (duplicatePendingRes.rowCount > 0) {
+              skippedDuplicates += 1;
+              console.log("Skipping duplicate pending confirmation row", {
+                matchedStudentId,
                 courseId,
                 beginDate,
                 completionDate,
-                status: normalizedStatus,
-                grade: normalizedGrade,
-                matchedStudentId,
               });
+              continue;
+            }
 
               if (duplicatePendingRes.rowCount > 0) {
                 skippedDuplicates += 1;
@@ -612,11 +600,25 @@ app.post("/upload-students", upload.single("file"), async (req, res) => {
                 fullName,
                 email,
                 phone,
-                matchedStudentId,
+                offeringTitle,
                 courseId,
-              });
-              continue;
-            }
+                beginDate,
+                completionDate,
+                normalizedStatus,
+                normalizedGrade,
+                matchedStudentId,
+              ]
+            );
+
+            pendingConfirmations += 1;
+            console.log("Pending confirmation created", {
+              fullName,
+              email,
+              phone,
+              matchedStudentId,
+              courseId,
+            });
+            continue;
           }
 
           const existingCheck = await pool.query(
