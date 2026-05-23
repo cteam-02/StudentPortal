@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Plus, ShieldCheck, User, X } from "lucide-react";
+import { Activity, Plus, RefreshCw, ShieldCheck, User, X } from "lucide-react";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import AppHeader from "../../app/components/AppHeader/AppHeader.jsx";
@@ -16,37 +16,7 @@ function UserManagement({
   onOpenUsers,
   onLogout,
 }) {
-  const [users, setUsers] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [showForm, setShowForm] = useState(false);
-
-  const fetchUsers = async () => {
-    try {
-      setLoading(true);
-      const response = await fetch(`${API_BASE_URL}/auth/users`, {
-        headers: { "x-user-id": String(currentUser?.id) },
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Failed to load users");
-      setUsers(data);
-    } catch (error) {
-      toast.error(error.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (currentUser?.role === "super_admin") {
-      fetchUsers();
-    }
-  }, [currentUser]);
-
-  const handleUserAdded = (newUser) => {
-    setUsers((prev) => [...prev, newUser]);
-    setShowForm(false);
-    toast.success(`User "${newUser.name}" added successfully`);
-  };
+  const [activeTab, setActiveTab] = useState("users");
 
   if (currentUser?.role !== "super_admin") {
     return (
@@ -87,78 +57,239 @@ function UserManagement({
       />
 
       <main className="um-main">
+        {/* Page header */}
         <section className="um-hero">
           <div>
             <p className="um-kicker">Administration</p>
-            <h1>Portal Users</h1>
+            <h1>{activeTab === "users" ? "Portal Users" : "Activity Log"}</h1>
             <p className="um-subtitle">
-              Manage who can access this portal. Add new admins or view existing accounts.
+              {activeTab === "users"
+                ? "Manage who can access this portal. Add new admins or view existing accounts."
+                : "Track all user actions across the portal in real time."}
             </p>
           </div>
+        </section>
+
+        {/* Tabs */}
+        <div className="um-tabs">
           <button
             type="button"
-            className="um-add-btn"
-            onClick={() => setShowForm(true)}
+            className={`um-tab${activeTab === "users" ? " is-active" : ""}`}
+            onClick={() => setActiveTab("users")}
           >
-            <Plus size={15} strokeWidth={2.5} />
-            Add User
+            <User size={14} strokeWidth={2.2} />
+            Users
           </button>
-        </section>
+          <button
+            type="button"
+            className={`um-tab${activeTab === "activity" ? " is-active" : ""}`}
+            onClick={() => setActiveTab("activity")}
+          >
+            <Activity size={14} strokeWidth={2.2} />
+            Activity Log
+          </button>
+        </div>
 
-        {showForm && (
-          <AddUserForm
-            currentUser={currentUser}
-            onUserAdded={handleUserAdded}
-            onClose={() => setShowForm(false)}
-          />
+        {activeTab === "users" ? (
+          <UsersTab currentUser={currentUser} />
+        ) : (
+          <ActivityLogTab currentUser={currentUser} />
         )}
-
-        <section className="um-table-section">
-          {loading ? (
-            <p className="um-loading">Loading users…</p>
-          ) : (
-            <table className="um-table">
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>Email</th>
-                  <th>Role</th>
-                  <th>Added</th>
-                </tr>
-              </thead>
-              <tbody>
-                {users.map((user) => (
-                  <tr key={user.id}>
-                    <td>
-                      <div className="um-user-cell">
-                        <div className="um-avatar">
-                          {getInitials(user.name)}
-                        </div>
-                        <span>{user.name}</span>
-                      </div>
-                    </td>
-                    <td className="um-email">{user.email}</td>
-                    <td>
-                      <span className={`um-role-badge${user.role === "super_admin" ? " is-super" : ""}`}>
-                        {user.role === "super_admin" ? (
-                          <><ShieldCheck size={11} strokeWidth={2.5} /> Super Admin</>
-                        ) : (
-                          <><User size={11} strokeWidth={2.5} /> Admin</>
-                        )}
-                      </span>
-                    </td>
-                    <td className="um-date">{formatDate(user.created_at)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </section>
       </main>
     </div>
   );
 }
 
+/* ── Users tab ────────────────────────────��─────────── */
+function UsersTab({ currentUser }) {
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+
+  const fetchUsers = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch(`${API_BASE_URL}/auth/users`, {
+        headers: { "x-user-id": String(currentUser?.id) },
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Failed to load users");
+      setUsers(data);
+    } catch (error) {
+      toast.error(error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
+  const handleUserAdded = (newUser) => {
+    setUsers((prev) => [...prev, newUser]);
+    setShowForm(false);
+    toast.success(`User "${newUser.name}" added successfully`);
+  };
+
+  return (
+    <>
+      <div className="um-tab-toolbar">
+        <button
+          type="button"
+          className="um-add-btn"
+          onClick={() => setShowForm(true)}
+        >
+          <Plus size={15} strokeWidth={2.5} />
+          Add User
+        </button>
+      </div>
+
+      {showForm && (
+        <AddUserForm
+          currentUser={currentUser}
+          onUserAdded={handleUserAdded}
+          onClose={() => setShowForm(false)}
+        />
+      )}
+
+      <section className="um-table-section">
+        {loading ? (
+          <p className="um-loading">Loading users…</p>
+        ) : (
+          <table className="um-table">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Role</th>
+                <th>Added</th>
+              </tr>
+            </thead>
+            <tbody>
+              {users.map((user) => (
+                <tr key={user.id}>
+                  <td>
+                    <div className="um-user-cell">
+                      <div className="um-avatar">{getInitials(user.name)}</div>
+                      <span>{user.name}</span>
+                    </div>
+                  </td>
+                  <td className="um-email">{user.email}</td>
+                  <td>
+                    <span className={`um-role-badge${user.role === "super_admin" ? " is-super" : ""}`}>
+                      {user.role === "super_admin" ? (
+                        <><ShieldCheck size={11} strokeWidth={2.5} /> Super Admin</>
+                      ) : (
+                        <><User size={11} strokeWidth={2.5} /> Admin</>
+                      )}
+                    </span>
+                  </td>
+                  <td className="um-date">{formatDate(user.created_at)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </section>
+    </>
+  );
+}
+
+/* ── Activity Log tab ─���─────────────────────────────── */
+function ActivityLogTab({ currentUser }) {
+  const [logs, setLogs] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchLogs = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch(`${API_BASE_URL}/auth/activity-logs?limit=100`, {
+        headers: { "x-user-id": String(currentUser?.id) },
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Failed to load logs");
+      setLogs(data);
+    } catch (error) {
+      toast.error(error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchLogs();
+  }, []);
+
+  return (
+    <>
+      <div className="um-tab-toolbar">
+        <span className="um-log-count">{logs.length} recent entries</span>
+        <button
+          type="button"
+          className="um-refresh-btn"
+          onClick={fetchLogs}
+          disabled={loading}
+          title="Refresh"
+        >
+          <RefreshCw size={14} className={loading ? "um-spin" : ""} />
+          Refresh
+        </button>
+      </div>
+
+      <section className="um-table-section">
+        {loading ? (
+          <p className="um-loading">Loading activity log…</p>
+        ) : logs.length === 0 ? (
+          <p className="um-loading">No activity recorded yet.</p>
+        ) : (
+          <table className="um-table um-log-table">
+            <thead>
+              <tr>
+                <th>Timestamp</th>
+                <th>User</th>
+                <th>Action</th>
+                <th>Details</th>
+              </tr>
+            </thead>
+            <tbody>
+              {logs.map((log) => (
+                <tr key={log.id}>
+                  <td className="um-log-time">
+                    <span>{formatDateTime(log.created_at)}</span>
+                  </td>
+                  <td>
+                    {log.user_name ? (
+                      <div className="um-user-cell">
+                        <div className="um-avatar um-avatar-sm">
+                          {getInitials(log.user_name)}
+                        </div>
+                        <div>
+                          <span className="um-log-username">{log.user_name}</span>
+                          <span className="um-log-useremail">{log.user_email}</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <span className="um-log-unknown">Unknown</span>
+                    )}
+                  </td>
+                  <td>
+                    <span className={`um-action-badge um-action-${getActionTone(log.action)}`}>
+                      {formatAction(log.action)}
+                    </span>
+                  </td>
+                  <td className="um-log-details">{log.details || "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </section>
+    </>
+  );
+}
+
+/* ── Add user form ───────────────────────────��──────── */
 function AddUserForm({ currentUser, onUserAdded, onClose }) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -268,23 +399,52 @@ function AddUserForm({ currentUser, onUserAdded, onClose }) {
   );
 }
 
+/* ── Helpers ────────────────────────────────────────── */
 function getInitials(name) {
   if (!name) return "U";
-  return name
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((p) => p[0].toUpperCase())
-    .join("");
+  return name.split(" ").filter(Boolean).slice(0, 2).map((p) => p[0].toUpperCase()).join("");
 }
 
 function formatDate(value) {
   if (!value) return "—";
   return new Date(value).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
+    month: "short", day: "numeric", year: "numeric",
   });
+}
+
+function formatDateTime(value) {
+  if (!value) return "—";
+  const d = new Date(value);
+  return d.toLocaleString("en-US", {
+    month: "short", day: "numeric", year: "numeric",
+    hour: "2-digit", minute: "2-digit",
+  });
+}
+
+function formatAction(action) {
+  const map = {
+    LOGIN_SUCCESS:              "Login",
+    LOGIN_FAILED:               "Login Failed",
+    USER_CREATED:               "User Created",
+    CSV_IMPORT:                 "CSV Import",
+    PENDING_MERGED:             "Pending Merged",
+    STUDENT_CREATED_FROM_PENDING: "Student Created",
+    ALL_DATA_DELETED:           "Data Deleted",
+  };
+  return map[action] || action;
+}
+
+function getActionTone(action) {
+  const map = {
+    LOGIN_SUCCESS:              "green",
+    LOGIN_FAILED:               "red",
+    USER_CREATED:               "purple",
+    CSV_IMPORT:                 "blue",
+    PENDING_MERGED:             "teal",
+    STUDENT_CREATED_FROM_PENDING: "teal",
+    ALL_DATA_DELETED:           "red",
+  };
+  return map[action] || "grey";
 }
 
 export default UserManagement;

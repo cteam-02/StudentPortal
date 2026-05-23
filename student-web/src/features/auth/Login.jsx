@@ -73,9 +73,14 @@ function Header() {
   );
 }
 
+const REMEMBER_KEY = "portal_remember_me";
+
 function LoginCard({ onLoginSuccess }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [remember, setRemember] = useState(
+    () => localStorage.getItem(REMEMBER_KEY) !== "false"
+  );
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -99,7 +104,7 @@ function LoginCard({ onLoginSuccess }) {
         return;
       }
 
-      onLoginSuccess?.(data);
+      onLoginSuccess?.(data, remember);
     } catch {
       setError("Unable to connect to server. Please try again.");
     } finally {
@@ -148,7 +153,14 @@ function LoginCard({ onLoginSuccess }) {
 
         <div className="login-options">
           <label className="login-remember">
-            <input type="checkbox" />
+            <input
+              type="checkbox"
+              checked={remember}
+              onChange={(e) => {
+                setRemember(e.target.checked);
+                localStorage.setItem(REMEMBER_KEY, String(e.target.checked));
+              }}
+            />
             <span>Remember Me</span>
           </label>
           <a href="#" className="login-forgot-link">

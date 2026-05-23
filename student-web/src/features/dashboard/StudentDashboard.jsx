@@ -81,6 +81,7 @@ function StudentDashboard({
 
       const response = await fetch(`${API_BASE_URL}/upload-students`, {
         method: "POST",
+        headers: { "x-user-id": String(currentUser?.id ?? "") },
         body: formData,
       });
 
@@ -116,6 +117,7 @@ function StudentDashboard({
 
       const response = await fetch(`${API_BASE_URL}/students`, {
         method: "DELETE",
+        headers: { "x-user-id": String(currentUser?.id ?? "") },
       });
 
       if (!response.ok) {

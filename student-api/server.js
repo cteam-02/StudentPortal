@@ -59,6 +59,46 @@ async function ensurePortalUserTable() {
   }
 }
 
+async function ensureUserActivityLogTable() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS UserActivityLog (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER REFERENCES PortalUser(id) ON DELETE SET NULL,
+      user_name TEXT,
+      user_email TEXT,
+      action TEXT NOT NULL,
+      details TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+}
+
+async function logActivity(userId, action, details = null) {
+  try {
+    let userName = null;
+    let userEmail = null;
+
+    if (userId) {
+      const userRes = await pool.query(
+        `SELECT name, email FROM PortalUser WHERE id = $1 LIMIT 1`,
+        [userId]
+      );
+      if (userRes.rowCount > 0) {
+        userName = userRes.rows[0].name;
+        userEmail = userRes.rows[0].email;
+      }
+    }
+
+    await pool.query(
+      `INSERT INTO UserActivityLog (user_id, user_name, user_email, action, details)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [userId || null, userName, userEmail, action, details]
+    );
+  } catch (err) {
+    console.error("Failed to log activity:", err.message);
+  }
+}
+
 async function ensurePendingConfirmationTable() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS PendingStudentConfirmation (
@@ -228,13 +268,16 @@ app.post("/auth/login", async (req, res) => {
       [email]
     );
     if (result.rowCount === 0) {
+      await logActivity(null, "LOGIN_FAILED", `Failed login attempt for email: ${email}`);
       return res.status(401).json({ error: "Invalid credentials" });
     }
     const user = result.rows[0];
     const match = await bcrypt.compare(password, user.password_hash);
     if (!match) {
+      await logActivity(user.id, "LOGIN_FAILED", `Incorrect password for: ${email}`);
       return res.status(401).json({ error: "Invalid credentials" });
     }
+    await logActivity(user.id, "LOGIN_SUCCESS", `Logged in as ${user.role}`);
     res.json({ id: user.id, name: user.name, email: user.email, role: user.role });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -281,6 +324,7 @@ app.post("/auth/users", async (req, res) => {
        RETURNING id, name, email, role, created_at`,
       [name, email, hash, role || "admin"]
     );
+    await logActivity(requesterId, "USER_CREATED", `Created portal user: ${email} (${role || "admin"})`);
     res.status(201).json(result.rows[0]);
   } catch (error) {
     if (error.code === "23505") {
@@ -590,6 +634,12 @@ app.post("/upload-students", upload.single("file"), async (req, res) => {
           });
         }
 
+        const requesterId = req.headers["x-user-id"];
+        await logActivity(
+          requesterId || null,
+          "CSV_IMPORT",
+          `Imported ${insertedCount} rows, skipped ${skippedDuplicates} duplicates, ${pendingConfirmations} pending confirmations (${results.length} total rows processed)`
+        );
         res.json({
           message: "Students & courses imported successfully 🎉",
           processedRows: results.length,
@@ -657,6 +707,12 @@ app.post("/pending-confirmations/:id/merge", async (req, res) => {
       [pendingId]
     );
 
+    const mergeRequesterId = req.headers["x-user-id"];
+    await logActivity(
+      mergeRequesterId || null,
+      "PENDING_MERGED",
+      `Merged pending confirmation #${pendingId} into student ID ${targetStudentId}`
+    );
     res.json({ message: "Pending confirmation merged successfully" });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -711,7 +767,37 @@ app.post("/pending-confirmations/:id/create-student", async (req, res) => {
       [pendingId]
     );
 
+    const createRequesterId = req.headers["x-user-id"];
+    await logActivity(
+      createRequesterId || null,
+      "STUDENT_CREATED_FROM_PENDING",
+      `Created new student "${pending.imported_name}" (${pending.imported_email}) from pending confirmation #${pendingId}`
+    );
     res.json({ message: "New student created from pending confirmation" });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get("/auth/activity-logs", async (req, res) => {
+  const requesterId = req.headers["x-user-id"];
+  try {
+    const authCheck = await pool.query(
+      `SELECT role FROM PortalUser WHERE id = $1 LIMIT 1`,
+      [requesterId]
+    );
+    if (authCheck.rowCount === 0 || authCheck.rows[0].role !== "super_admin") {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+    const limit = Math.min(parseInt(req.query.limit) || 100, 500);
+    const result = await pool.query(
+      `SELECT id, user_id, user_name, user_email, action, details, created_at
+       FROM UserActivityLog
+       ORDER BY created_at DESC
+       LIMIT $1`,
+      [limit]
+    );
+    res.json(result.rows);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -723,6 +809,12 @@ app.delete("/students", async (req, res) => {
     await pool.query("DELETE FROM CourseHistory");
     const result = await pool.query("DELETE FROM Student");
 
+    const deleteRequesterId = req.headers["x-user-id"];
+    await logActivity(
+      deleteRequesterId || null,
+      "ALL_DATA_DELETED",
+      `Deleted all student data — ${result.rowCount} students removed`
+    );
     res.json({
       message: "All student data deleted successfully",
       deletedStudents: result.rowCount,
@@ -734,7 +826,7 @@ app.delete("/students", async (req, res) => {
 
 const port = process.env.PORT || 3000;
 
-Promise.all([ensurePendingConfirmationTable(), ensurePortalUserTable()])
+Promise.all([ensurePendingConfirmationTable(), ensurePortalUserTable(), ensureUserActivityLogTable()])
   .then(() => {
     app.listen(port, () => {
       console.log(`Server running on http://localhost:${port}`);
