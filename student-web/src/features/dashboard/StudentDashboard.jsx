@@ -97,10 +97,12 @@ function StudentDashboard({
           ? `, sent ${result.pendingConfirmations} to pending review`
           : "";
 
+      const newStudents = result.newStudents ?? 0;
+      const courseRecords = result.insertedRows ?? 0;
+      const skipped = result.skippedDuplicates ?? 0;
+
       toast.success(
-        `Imported ${result.insertedRows ?? 0} rows, skipped ${
-          result.skippedDuplicates ?? 0
-        } duplicates${pendingText}`
+        `${newStudents} new student${newStudents !== 1 ? "s" : ""} · ${courseRecords} course record${courseRecords !== 1 ? "s" : ""} imported, ${skipped} skipped${pendingText}`
       );
     } catch (error) {
       console.error("Error uploading students:", error);
