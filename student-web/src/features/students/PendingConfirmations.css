@@ -71,7 +71,6 @@
 }
 
 .pending-search-panel,
-.pending-summary-card,
 .pending-list-card,
 .pending-row-card {
   background: #ffffff;
@@ -111,55 +110,6 @@
   font-size: 14px;
 }
 
-.pending-summary-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 20px;
-}
-
-.pending-summary-card {
-  border-radius: 20px;
-  padding: 24px;
-}
-
-.pending-summary-icon {
-  width: 42px;
-  height: 42px;
-  border-radius: 14px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 14px;
-}
-
-.pending-summary-icon.is-warning {
-  background: #fff3dc;
-  color: #c78312;
-}
-
-.pending-summary-icon.is-info {
-  background: #e8f0ff;
-  color: #2f6df6;
-}
-
-.pending-summary-icon.is-success {
-  background: #e6f8ee;
-  color: #169b57;
-}
-
-.pending-summary-card span {
-  display: block;
-  color: #7b89a0;
-  font-size: 13px;
-  font-weight: 700;
-}
-
-.pending-summary-card strong {
-  display: block;
-  margin-top: 8px;
-  color: #192742;
-  font-size: 28px;
-}
 
 .pending-list-card {
   padding: 28px;
@@ -365,6 +315,86 @@
   align-self: flex-start;
 }
 
+/* ── Diff highlighting ──────────────────────────────── */
+.pending-person-name.is-different {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 8px;
+  background: #fffbeb;
+  border: 1px solid #fcd34d;
+  color: #92400e;
+  margin-bottom: 2px;
+}
+
+.pending-info-list div.is-different {
+  background: #fffbeb;
+  border-color: #fcd34d;
+}
+
+.pending-info-list div.is-different > span {
+  color: #b45309;
+}
+
+.pending-info-list div.is-different > strong {
+  color: #78350f;
+}
+
+/* ── Two-step merge confirm ─────────────────────────── */
+.pending-confirm-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.pending-confirm-prompt {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #92400e;
+}
+
+.pending-confirm-yes-btn {
+  min-height: 40px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 10px;
+  background: linear-gradient(180deg, #d97706 0%, #b45309 100%);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+
+.pending-confirm-yes-btn:hover {
+  opacity: 0.9;
+}
+
+.pending-confirm-yes-btn:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.pending-confirm-cancel-btn {
+  min-height: 40px;
+  padding: 0 16px;
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  background: #fff;
+  color: #4b5563;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.pending-confirm-cancel-btn:hover {
+  background: #f9fafb;
+}
+
 .pending-details-strip {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -444,7 +474,6 @@
 }
 
 @media (max-width: 960px) {
-  .pending-summary-grid,
   .pending-details-strip {
     grid-template-columns: 1fr;
   }
@@ -484,7 +513,6 @@
     padding: 18px;
   }
 
-  .pending-summary-card,
   .pending-count-card,
   .pending-person-card,
   .pending-course-pill,
