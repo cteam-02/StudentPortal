@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import {
+  AlertCircle,
   ArrowRight,
   BookOpen,
-  Download,
   FileUp,
+  GraduationCap,
   Trash2,
   Users,
 } from "lucide-react";
@@ -30,6 +31,12 @@ function StudentDashboard({
   const [courses, setCourses] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [orgStats, setOrgStats] = useState({
+    totalStudents: 0,
+    totalEnrollments: 0,
+    pendingConfirmations: 0,
+    totalCourses: 0,
+  });
 
   const fetchStudents = async () => {
     try {
@@ -42,8 +49,19 @@ function StudentDashboard({
     }
   };
 
+  const fetchOrgStats = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/stats`);
+      const data = await response.json();
+      setOrgStats(data);
+    } catch (error) {
+      console.error("Error fetching org stats:", error);
+    }
+  };
+
   useEffect(() => {
     fetchStudents();
+    fetchOrgStats();
   }, []);
 
   useEffect(() => {
@@ -59,7 +77,6 @@ function StudentDashboard({
   const loadCourses = async (student) => {
     try {
       setSelectedStudent(student);
-
       const response = await fetch(`${API_BASE_URL}/students/${student.id}/courses`);
       const data = await response.json();
       setCourses(data);
@@ -91,7 +108,8 @@ function StudentDashboard({
         throw new Error(result.error || "Upload failed");
       }
 
-      await fetchStudents();
+      await Promise.all([fetchStudents(), fetchOrgStats()]);
+
       const pendingText =
         result.pendingConfirmations > 0
           ? `, sent ${result.pendingConfirmations} to pending review`
@@ -130,6 +148,7 @@ function StudentDashboard({
       setStudents([]);
       setSelectedStudent(null);
       setCourses([]);
+      await fetchOrgStats();
       toast.success("All student data deleted successfully");
     } catch (error) {
       console.error("Error deleting all student data:", error);
@@ -154,7 +173,6 @@ function StudentDashboard({
   }, [searchQuery, students]);
 
   const completedCourses = courses.filter(isCompletedCourse).length;
-
   const activeCourses = courses.filter((course) => {
     const status = String(course.status || "").toLowerCase();
     return status.includes("active") || status.includes("progress");
@@ -185,8 +203,8 @@ function StudentDashboard({
             <p className="dashboard-kicker">Overview</p>
             <h1>Student Dashboard</h1>
             <p className="dashboard-subtitle">
-              Manage imports, review students, and inspect real course history
-              from one place.
+              Import student data, monitor org-wide enrollment stats, and
+              quickly look up individual students.
             </p>
           </div>
 
@@ -220,31 +238,31 @@ function StudentDashboard({
               <Users size={18} />
             </div>
             <span>Total Students</span>
-            <strong>{students.length.toLocaleString()}</strong>
+            <strong>{orgStats.totalStudents.toLocaleString()}</strong>
           </article>
 
           <article className="dashboard-summary-card">
             <div className="dashboard-summary-icon">
               <BookOpen size={18} />
             </div>
-            <span>Selected Courses</span>
-            <strong>{courses.length.toLocaleString()}</strong>
+            <span>Total Enrollments</span>
+            <strong>{orgStats.totalEnrollments.toLocaleString()}</strong>
           </article>
 
           <article className="dashboard-summary-card">
             <div className="dashboard-summary-icon">
-              <Download size={18} />
+              <GraduationCap size={18} />
             </div>
-            <span>Completed Courses</span>
-            <strong>{completedCourses.toLocaleString()}</strong>
+            <span>Courses in Catalog</span>
+            <strong>{orgStats.totalCourses.toLocaleString()}</strong>
           </article>
 
           <article className="dashboard-summary-card">
             <div className="dashboard-summary-icon">
-              <ArrowRight size={18} />
+              <AlertCircle size={18} />
             </div>
-            <span>Active Courses</span>
-            <strong>{activeCourses.toLocaleString()}</strong>
+            <span>Pending Reviews</span>
+            <strong>{orgStats.pendingConfirmations.toLocaleString()}</strong>
           </article>
         </section>
 
@@ -304,20 +322,10 @@ function StudentDashboard({
                 <h2>Student Record</h2>
                 <p>
                   {selectedStudent
-                    ? "Current selection and course history"
-                    : "Choose a student to inspect their details"}
+                    ? "Quick overview — open the full profile for course history"
+                    : "Choose a student from the left to see their details"}
                 </p>
               </div>
-
-              {selectedStudent && (
-                <button
-                  type="button"
-                  className="dashboard-inline-link"
-                  onClick={() => onOpenProfile?.(selectedStudent)}
-                >
-                  Open profile
-                </button>
-              )}
             </div>
 
             {!selectedStudent ? (
@@ -327,76 +335,42 @@ function StudentDashboard({
                 </div>
                 <h3>No student selected</h3>
                 <p>
-                  Pick a student from the left panel to load real course
-                  history, grades, and completion dates.
+                  Pick a student from the list to see their identity details
+                  and open their full training profile.
                 </p>
               </div>
             ) : (
-              <>
-                <div className="dashboard-record-card">
-                  <div className="dashboard-student-hero">
-                    <div className="dashboard-student-avatar large">
-                      {getInitials(selectedStudent.name)}
-                    </div>
-                    <div className="dashboard-student-hero-copy">
-                      <span className="dashboard-student-label">
-                        Selected student
-                      </span>
-                      <h3>{selectedStudent.name}</h3>
-                      <p>{selectedStudent.email || "No email on file"}</p>
-                    </div>
+              <div className="dashboard-record-card">
+                <div className="dashboard-student-hero">
+                  <div className="dashboard-student-avatar large">
+                    {getInitials(selectedStudent.name)}
                   </div>
-
-                  <div className="dashboard-student-badges">
-                    <span>ID {selectedStudent.id}</span>
-                    <span>{selectedStudent.phone || "Phone unavailable"}</span>
-                    <span>{courses.length} courses</span>
-                    <span>{completedCourses} completed</span>
+                  <div className="dashboard-student-hero-copy">
+                    <span className="dashboard-student-label">
+                      Selected student
+                    </span>
+                    <h3>{selectedStudent.name}</h3>
+                    <p>{selectedStudent.email || "No email on file"}</p>
                   </div>
                 </div>
 
-                <div className="dashboard-course-section">
-                  <div className="dashboard-course-heading">
-                    <h3>Course History</h3>
-                    <span>{courses.length} records</span>
-                  </div>
-
-                  {courses.length === 0 ? (
-                    <p className="dashboard-empty-state">
-                      No course history found for this student.
-                    </p>
-                  ) : (
-                    <div className="dashboard-course-list">
-                      {courses.map((course, index) => (
-                        <div
-                          key={`${course.course_title || "course"}-${index}`}
-                          className="dashboard-course-item"
-                        >
-                          <div className="dashboard-course-main">
-                            <strong>{course.course_title || "Untitled course"}</strong>
-                            <div className="dashboard-course-meta">
-                              <span className="dashboard-course-grade">
-                                Grade {course.grade || "N/A"}
-                              </span>
-                              <span
-                                className={`dashboard-course-status ${getStatusTone(
-                                  course.status
-                                )}`}
-                              >
-                                {course.status || "Status unavailable"}
-                              </span>
-                            </div>
-                          </div>
-                          <div className="dashboard-course-dates">
-                            <span>Start: {formatDateTime(course.begin_date)}</span>
-                            <span>End: {formatDateTime(course.completion_date)}</span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                <div className="dashboard-student-badges">
+                  <span>ID {selectedStudent.id}</span>
+                  <span>{selectedStudent.phone || "Phone unavailable"}</span>
+                  <span>{courses.length} course{courses.length !== 1 ? "s" : ""}</span>
+                  <span>{completedCourses} completed</span>
+                  <span>{activeCourses} active</span>
                 </div>
-              </>
+
+                <button
+                  type="button"
+                  className="dashboard-profile-btn"
+                  onClick={() => onOpenProfile?.(selectedStudent)}
+                >
+                  <span>Open Full Profile</span>
+                  <ArrowRight size={15} />
+                </button>
+              </div>
             )}
           </article>
         </section>
@@ -416,19 +390,6 @@ function getInitials(name) {
     .join("");
 }
 
-function formatDateTime(value) {
-  if (!value) return "Date unavailable";
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-
-  return date.toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-}
-
 function isCompletedCourse(course) {
   const status = String(course?.status || "").toLowerCase();
 
@@ -442,24 +403,6 @@ function isCompletedCourse(course) {
   }
 
   return Boolean(course?.completion_date);
-}
-
-function getStatusTone(status) {
-  const value = String(status || "").toLowerCase();
-
-  if (value.includes("complete") || value.includes("pass")) {
-    return "is-complete";
-  }
-
-  if (value.includes("active") || value.includes("progress")) {
-    return "is-active";
-  }
-
-  if (value.includes("pending")) {
-    return "is-pending";
-  }
-
-  return "is-neutral";
 }
 
 export default StudentDashboard;

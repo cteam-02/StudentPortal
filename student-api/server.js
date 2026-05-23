@@ -257,6 +257,25 @@ app.get("/", (req, res) => {
   res.send("Student API is running");
 });
 
+app.get("/stats", async (req, res) => {
+  try {
+    const [studentsRes, enrollmentsRes, pendingRes, coursesRes] = await Promise.all([
+      pool.query("SELECT COUNT(*) FROM Student"),
+      pool.query("SELECT COUNT(*) FROM CourseHistory"),
+      pool.query("SELECT COUNT(*) FROM PendingStudentConfirmation WHERE resolution_status = 'pending'"),
+      pool.query("SELECT COUNT(*) FROM Course"),
+    ]);
+    res.json({
+      totalStudents: parseInt(studentsRes.rows[0].count),
+      totalEnrollments: parseInt(enrollmentsRes.rows[0].count),
+      pendingConfirmations: parseInt(pendingRes.rows[0].count),
+      totalCourses: parseInt(coursesRes.rows[0].count),
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.post("/auth/login", async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) {

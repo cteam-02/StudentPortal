@@ -3,7 +3,6 @@ import {
   CalendarDays,
   ChevronLeft,
   ChevronRight,
-  Search,
   SlidersHorizontal,
 } from "lucide-react";
 import AppHeader from "../../app/components/AppHeader/AppHeader.jsx";
@@ -180,18 +179,6 @@ function StudentDirectory({
             <strong>{students.length.toLocaleString()}</strong>
             <span>Total Students</span>
           </div>
-        </section>
-
-        <section className="directory-search-panel">
-          <label className="directory-page-search">
-            <Search size={16} />
-            <input
-              type="text"
-              placeholder="Search by name, email, or phone number"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-            />
-          </label>
         </section>
 
         <section className="directory-filter-bar">
