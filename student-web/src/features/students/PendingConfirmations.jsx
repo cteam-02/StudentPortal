@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, ArrowRightLeft, CheckCircle2, Search, UserPlus } from "lucide-react";
+import { AlertTriangle, ArrowRightLeft, Search, UserPlus } from "lucide-react";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import AppHeader from "../../app/components/AppHeader/AppHeader.jsx";
@@ -20,6 +20,7 @@ function PendingConfirmations({
   const [pendingRows, setPendingRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [workingId, setWorkingId] = useState(null);
+  const [confirmingMergeId, setConfirmingMergeId] = useState(null);
 
   const fetchPendingRows = async () => {
     try {
@@ -66,6 +67,7 @@ function PendingConfirmations({
   const handleResolve = async (id, action) => {
     try {
       setWorkingId(id);
+      setConfirmingMergeId(null);
 
       const response = await fetch(
         `${API_BASE_URL}/pending-confirmations/${id}/${action}`,
@@ -86,7 +88,7 @@ function PendingConfirmations({
       toast.success(
         action === "merge"
           ? "Merged into the existing student record"
-          : "Created a new student record"
+          : "Kept as a new student record"
       );
 
       setPendingRows((currentRows) =>
@@ -99,6 +101,8 @@ function PendingConfirmations({
       setWorkingId(null);
     }
   };
+
+  const potentialMergesCount = pendingRows.filter((row) => row.matched_student_id).length;
 
   return (
     <div className="pending-shell">
@@ -121,8 +125,8 @@ function PendingConfirmations({
             <h1>Pending Confirmations</h1>
             <p className="pending-subtitle">
               These imports matched an existing student on two of the three key
-              fields: name, email, and phone. Review each one before it becomes
-              part of the permanent record.
+              fields: name, email, and phone. The differing field is highlighted
+              on each card. Review and decide whether to merge or keep separate.
             </p>
           </div>
 
@@ -144,37 +148,17 @@ function PendingConfirmations({
           </label>
         </section>
 
-        <section className="pending-summary-grid">
-          <article className="pending-summary-card">
-            <div className="pending-summary-icon is-warning">
-              <AlertTriangle size={18} />
-            </div>
-            <span>Total pending</span>
-            <strong>{pendingRows.length}</strong>
-          </article>
-
-          <article className="pending-summary-card">
-            <div className="pending-summary-icon is-info">
-              <ArrowRightLeft size={18} />
-            </div>
-            <span>Potential merges</span>
-            <strong>{pendingRows.filter((row) => row.matched_student_id).length}</strong>
-          </article>
-
-          <article className="pending-summary-card">
-            <div className="pending-summary-icon is-success">
-              <CheckCircle2 size={18} />
-            </div>
-            <span>Filtered results</span>
-            <strong>{filteredRows.length}</strong>
-          </article>
-        </section>
-
         <section className="pending-list-card">
           <div className="pending-card-header">
             <div>
               <h2>Records Needing Confirmation</h2>
-              <p>Choose whether each import should merge into an existing student or create a new student record.</p>
+              <p>
+                {query.trim()
+                  ? `${filteredRows.length} of ${pendingRows.length} records matching search`
+                  : `${pendingRows.length} record${pendingRows.length !== 1 ? "s" : ""} awaiting review`}
+                {potentialMergesCount > 0 &&
+                  ` · ${potentialMergesCount} potential merge${potentialMergesCount !== 1 ? "s" : ""}`}
+              </p>
             </div>
           </div>
 
@@ -183,11 +167,18 @@ function PendingConfirmations({
               <div className="pending-empty-state">Loading pending confirmations...</div>
             ) : filteredRows.length === 0 ? (
               <div className="pending-empty-state">
-                No pending confirmations to review right now.
+                {query.trim()
+                  ? "No records match your search."
+                  : "No pending confirmations to review right now."}
               </div>
             ) : (
               filteredRows.map((row) => {
                 const isWorking = workingId === row.id;
+                const isConfirming = confirmingMergeId === row.id;
+
+                const nameDiffers = fieldDiffers(row.imported_name, row.matched_student_name);
+                const emailDiffers = fieldDiffers(row.imported_email, row.matched_student_email);
+                const phoneDiffers = fieldDiffers(row.imported_phone, row.matched_student_phone);
 
                 return (
                   <article key={row.id} className="pending-row-card">
@@ -195,33 +186,26 @@ function PendingConfirmations({
                       <section className="pending-row-intro">
                         <p className="pending-row-label">Possible duplicate</p>
                         <h3>{row.imported_name || "Unnamed student"}</h3>
-                        <p className="pending-row-caption">
-                          Two of the three identity fields matched an existing
-                          student record, while the remaining field differed.
-                          Choose whether to merge this enrollment or keep it as
-                          a new student.
-                        </p>
                       </section>
 
                       <section className="pending-course-pill">
                         <span>Course</span>
                         <strong>{row.offering_title || "Unknown course"}</strong>
-                        <small>Imported for review</small>
                       </section>
                     </div>
 
                     <div className="pending-comparison-grid">
                       <section className="pending-person-card">
                         <p className="pending-row-label">Imported record</p>
-                        <strong className="pending-person-name">
+                        <strong className={`pending-person-name${nameDiffers ? " is-different" : ""}`}>
                           {row.imported_name || "Unnamed student"}
                         </strong>
                         <div className="pending-info-list">
-                          <div>
+                          <div className={emailDiffers ? "is-different" : ""}>
                             <span>Email</span>
                             <strong>{row.imported_email || "No email"}</strong>
                           </div>
-                          <div>
+                          <div className={phoneDiffers ? "is-different" : ""}>
                             <span>Phone</span>
                             <strong>{row.imported_phone || "No phone"}</strong>
                           </div>
@@ -234,17 +218,17 @@ function PendingConfirmations({
 
                       <section className="pending-person-card is-match">
                         <p className="pending-row-label">Potential existing student</p>
-                        <strong className="pending-person-name">
+                        <strong className={`pending-person-name${nameDiffers ? " is-different" : ""}`}>
                           {row.matched_student_name || "No match found"}
                         </strong>
                         <div className="pending-info-list">
-                          <div>
+                          <div className={emailDiffers ? "is-different" : ""}>
                             <span>Email</span>
                             <strong>
                               {row.matched_student_email || "No email available"}
                             </strong>
                           </div>
-                          <div>
+                          <div className={phoneDiffers ? "is-different" : ""}>
                             <span>Phone</span>
                             <strong>
                               {row.matched_student_phone || "No phone available"}
@@ -297,18 +281,42 @@ function PendingConfirmations({
                         disabled={isWorking}
                       >
                         <UserPlus size={16} />
-                        <span>{isWorking ? "Saving..." : "Create New Student"}</span>
+                        <span>{isWorking ? "Saving..." : "Keep as New Student"}</span>
                       </button>
 
-                      <button
-                        type="button"
-                        className="pending-primary-btn"
-                        onClick={() => handleResolve(row.id, "merge")}
-                        disabled={isWorking || !row.matched_student_id}
-                      >
-                        <ArrowRightLeft size={16} />
-                        <span>{isWorking ? "Saving..." : "Merge to Existing Student"}</span>
-                      </button>
+                      {isConfirming ? (
+                        <div className="pending-confirm-group">
+                          <span className="pending-confirm-prompt">
+                            <AlertTriangle size={14} />
+                            Merge into &ldquo;{row.matched_student_name}&rdquo;?
+                          </span>
+                          <button
+                            type="button"
+                            className="pending-confirm-yes-btn"
+                            onClick={() => handleResolve(row.id, "merge")}
+                            disabled={isWorking}
+                          >
+                            {isWorking ? "Merging..." : "Yes, Merge"}
+                          </button>
+                          <button
+                            type="button"
+                            className="pending-confirm-cancel-btn"
+                            onClick={() => setConfirmingMergeId(null)}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          className="pending-primary-btn"
+                          onClick={() => setConfirmingMergeId(row.id)}
+                          disabled={isWorking || !row.matched_student_id}
+                        >
+                          <ArrowRightLeft size={16} />
+                          <span>Merge to Existing Student</span>
+                        </button>
+                      )}
                     </div>
                   </article>
                 );
@@ -319,6 +327,10 @@ function PendingConfirmations({
       </main>
     </div>
   );
+}
+
+function fieldDiffers(a, b) {
+  return String(a || "").trim().toLowerCase() !== String(b || "").trim().toLowerCase();
 }
 
 function formatDateTime(value) {
