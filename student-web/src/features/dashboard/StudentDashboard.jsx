@@ -25,6 +25,7 @@ function StudentDashboard({
   onOpenProfile,
   focusedStudentId,
   onFocusedStudentHandled,
+  onLogout,
 }) {
   const [students, setStudents] = useState([]);
   const [selectedStudent, setSelectedStudent] = useState(null);
@@ -195,6 +196,7 @@ function StudentDashboard({
         searchPlaceholder="Search students, email, phone..."
         searchValue={searchQuery}
         onSearchChange={setSearchQuery}
+        onLogout={onLogout}
       />
 
       <main className="dashboard-main">
