@@ -288,7 +288,12 @@ function PendingConfirmations({
                         <div className="pending-confirm-group">
                           <span className="pending-confirm-prompt">
                             <AlertTriangle size={14} />
-                            Merge into &ldquo;{row.matched_student_name}&rdquo;?
+                            Merge into &ldquo;{row.matched_student_name}&rdquo;
+                            {phoneDiffers && row.imported_phone
+                              ? ` and add ${row.imported_phone} as an alt phone?`
+                              : emailDiffers && row.imported_email
+                              ? ` and add ${row.imported_email} as an alt email?`
+                              : "?"}
                           </span>
                           <button
                             type="button"
@@ -314,7 +319,13 @@ function PendingConfirmations({
                           disabled={isWorking || !row.matched_student_id}
                         >
                           <ArrowRightLeft size={16} />
-                          <span>Merge to Existing Student</span>
+                          <span>
+                            {phoneDiffers
+                              ? "Merge & Add Phone"
+                              : emailDiffers
+                              ? "Merge & Add Email"
+                              : "Merge to Existing Student"}
+                          </span>
                         </button>
                       )}
                     </div>
