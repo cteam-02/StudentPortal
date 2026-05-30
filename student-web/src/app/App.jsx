@@ -15,7 +15,9 @@ import CoursesCatalog from "../features/courses/CoursesCatalog.jsx";
 import CourseDetail from "../features/courses/CourseDetail.jsx";
 
 function App() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(
+    () => localStorage.getItem("rememberMe") === "true"
+  );
   const [focusedStudentId, setFocusedStudentId] = useState(null);
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [selectedCourse, setSelectedCourse] = useState(null);
@@ -30,7 +32,12 @@ function App() {
     return location.state?.course || selectedCourse;
   }, [location.state, selectedCourse]);
 
-  const handleLoginSuccess = () => {
+  const handleLoginSuccess = (rememberMe) => {
+    if (rememberMe) {
+      localStorage.setItem("rememberMe", "true");
+    } else {
+      localStorage.removeItem("rememberMe");
+    }
     setIsLoggedIn(true);
     navigate("/dashboard", { replace: true });
   };
