@@ -82,6 +82,15 @@ function PendingConfirmations({
       const result = await response.json();
 
       if (!response.ok) {
+        // If creating a new student is blocked because same name+phone already exists,
+        // surface a clear message telling the admin to merge instead.
+        if (response.status === 409 && result.conflictStudentId) {
+          toast.error(
+            `Duplicate detected — a student with this name and phone already exists. Use "Merge to Existing Student" instead.`,
+            { autoClose: 6000 }
+          );
+          return;
+        }
         throw new Error(result.error || "Failed to resolve confirmation");
       }
 

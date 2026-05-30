@@ -205,6 +205,40 @@ async function findStudentByNameOnlyMismatch(fullName, email, phone) {
   );
 }
 
+// Finds a student whose phone matches but BOTH name AND email differ.
+async function findStudentByPhoneOnlyMismatch(fullName, email, phone) {
+  if (!phone) return { rowCount: 0, rows: [] };
+  return pool.query(
+    `
+    SELECT id, name, email, phone
+    FROM Student
+    WHERE TRIM(COALESCE(phone, '')) = TRIM($3)
+      AND LOWER(TRIM(COALESCE(name, '')))  != LOWER(TRIM($1))
+      AND LOWER(TRIM(COALESCE(email, ''))) != LOWER(TRIM(COALESCE($2, '')))
+    ORDER BY id
+    LIMIT 1
+    `,
+    [fullName, email || "", phone]
+  );
+}
+
+// Finds a student whose email matches but BOTH name AND phone differ.
+async function findStudentByEmailOnlyMismatch(fullName, email, phone) {
+  if (!email) return { rowCount: 0, rows: [] };
+  return pool.query(
+    `
+    SELECT id, name, email, phone
+    FROM Student
+    WHERE LOWER(TRIM(email)) = LOWER(TRIM($2))
+      AND LOWER(TRIM(COALESCE(name, '')))  != LOWER(TRIM($1))
+      AND TRIM(COALESCE(phone, '')) != TRIM(COALESCE($3, ''))
+    ORDER BY id
+    LIMIT 1
+    `,
+    [fullName, email, phone || ""]
+  );
+}
+
 async function findCourseByTitle(offeringTitle) {
   return pool.query(
     `
@@ -421,6 +455,36 @@ app.get("/courses", async (req, res) => {
   }
 });
 
+// Must be registered BEFORE /students/:id so Express doesn't treat "duplicates" as an ID
+app.get("/students/duplicates", async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT s.id, s.name, s.email, s.phone, s.alt_phones, s.alt_emails
+      FROM Student s
+      WHERE s.phone IS NOT NULL
+        AND EXISTS (
+          SELECT 1 FROM Student s2
+          WHERE s2.id != s.id
+            AND LOWER(TRIM(s2.name)) = LOWER(TRIM(s.name))
+            AND TRIM(s2.phone) = TRIM(s.phone)
+        )
+      ORDER BY LOWER(TRIM(s.name)), s.id
+    `);
+
+    // Group by name+phone key
+    const groups = {};
+    for (const row of result.rows) {
+      const key = `${row.name.trim().toLowerCase()}||${row.phone.trim()}`;
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(row);
+    }
+
+    res.json(Object.values(groups));
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.get("/students/:id", async (req, res) => {
   try {
     const result = await pool.query(
@@ -505,19 +569,22 @@ app.get("/pending-confirmations", async (req, res) => {
 //    → skip row silently
 //
 //  Tier 2 — EXACT STUDENT, NEW COURSE HISTORY  ← auto-merge
-//    name + email + phone all match,  AND one of:
-//      a) different course
-//      b) same course but different begin or completion date
-//      c) same course + date but different status or grade
+//    name + email + phone all match, different course or date/status/grade
 //    → insert new CourseHistory row for the existing student
 //
 //  Tier 3 — TWO-FIELD STUDENT MATCH  ← auto-merge + store alt contact
 //    name + email match, phone differs → merge course history, append alt_phone
 //    name + phone match, email differs → merge course history, append alt_email
 //
-//  Tier 4 — NAME-ONLY MATCH  ← human review
+//  Tier 4a — NAME-ONLY MATCH  ← human review (pending)
 //    name matches, email AND phone both differ
-//    → create PendingStudentConfirmation record
+//
+//  Tier 4b — PHONE-ONLY MATCH  ← human review (pending)
+//    phone matches, name AND email both differ
+//
+//  Tier 4c — EMAIL-ONLY MATCH  ← safe auto-merge
+//    email matches, name AND phone both differ
+//    → merge course history, append new phone as alt_phone (no name/phone overwrite)
 //
 //  Tier 5 — NO MATCH
 //    → create new Student + CourseHistory
@@ -802,26 +869,90 @@ app.post("/upload-students", upload.single("file"), async (req, res) => {
             continue;
           }
 
-          const existingCheck = await pool.query(
-            `SELECT id FROM Student WHERE LOWER(TRIM(email)) = LOWER(TRIM($1)) LIMIT 1`,
-            [email]
-          );
-          const isNewStudent = existingCheck.rowCount === 0;
+          // Tier 4b — PHONE-ONLY MATCH: same phone, different name AND email → pending
+          const phoneOnlyRes = await findStudentByPhoneOnlyMismatch(fullName, email, phone);
+          console.log("Phone-only match result", {
+            fullName, email, phone,
+            rowCount: phoneOnlyRes.rowCount,
+            matchedStudent: phoneOnlyRes.rows[0] || null,
+          });
 
+          if (phoneOnlyRes.rowCount > 0) {
+            const phoneMatchedStudent = phoneOnlyRes.rows[0];
+            const phoneMatchedStudentId = phoneMatchedStudent.id;
+
+            const dupPhoneRes = await findDuplicatePendingConfirmation({
+              importedName: fullName, importedEmail: email, importedPhone: phone,
+              courseId, beginDate, completionDate,
+              status: normalizedStatus, grade: normalizedGrade,
+              matchedStudentId: phoneMatchedStudentId,
+            });
+
+            if (dupPhoneRes.rowCount > 0) {
+              skippedDuplicates += 1;
+              console.log(`[SKIP] Duplicate pending confirmation (phone-only match) — student: "${fullName}", course: "${offeringTitle}"`);
+              continue;
+            }
+
+            await pool.query(
+              `INSERT INTO PendingStudentConfirmation
+                (imported_name, imported_email, imported_phone, offering_title,
+                 course_id, begin_date, completion_date, status, grade, matched_student_id)
+               VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+              [fullName, email, phone, offeringTitle, courseId, beginDate, completionDate,
+               normalizedStatus, normalizedGrade, phoneMatchedStudentId]
+            );
+            pendingConfirmations += 1;
+            console.log("Pending confirmation created (phone-only match)", { fullName, email, phone, phoneMatchedStudentId, courseId });
+            continue;
+          }
+
+          // Tier 4c — EMAIL-ONLY MATCH: same email, different name AND phone
+          // Safe auto-merge: add course history + store phone as alt; do NOT overwrite
+          // the existing student's name or primary phone.
+          const emailOnlyRes = await findStudentByEmailOnlyMismatch(fullName, email, phone);
+          console.log("Email-only match result", {
+            fullName, email, phone,
+            rowCount: emailOnlyRes.rowCount,
+            matchedStudent: emailOnlyRes.rows[0] || null,
+          });
+
+          if (emailOnlyRes.rowCount > 0) {
+            const emailMatchedStudentId = emailOnlyRes.rows[0].id;
+            const isEmailOnlyDuplicate = await hasDuplicateCourseHistory({
+              studentId: emailMatchedStudentId,
+              courseId, beginDate, completionDate,
+              status: normalizedStatus, grade: normalizedGrade,
+            });
+
+            if (isEmailOnlyDuplicate) {
+              skippedDuplicates += 1;
+              console.log("Skipping duplicate CourseHistory row (email-only match)", { emailMatchedStudentId, courseId });
+              continue;
+            }
+
+            await insertCourseHistory({
+              studentId: emailMatchedStudentId,
+              courseId, beginDate, completionDate,
+              status: normalizedStatus, grade: normalizedGrade,
+            });
+
+            if (phone && normalizeField(emailOnlyRes.rows[0].phone) !== phone) {
+              await addAltPhone(emailMatchedStudentId, phone);
+            }
+            insertedCount += 1;
+            console.log("CourseHistory auto-merged (email-only match)", { emailMatchedStudentId, courseId });
+            continue;
+          }
+
+          // Tier 5 — NO MATCH: create a brand-new student
           const studentRes = await pool.query(
-            `
-            INSERT INTO Student (name, email, phone)
-            VALUES ($1, $2, $3)
-            ON CONFLICT (email) DO UPDATE
-            SET name = EXCLUDED.name,
-                phone = EXCLUDED.phone
-            RETURNING id
-            `,
+            `INSERT INTO Student (name, email, phone) VALUES ($1, $2, $3) RETURNING id`,
             [fullName, email, phone]
           );
 
           const studentId = studentRes.rows[0].id;
-          const insertHistoryRes = await insertCourseHistory({
+          await insertCourseHistory({
             studentId,
             courseId,
             beginDate,
@@ -830,7 +961,7 @@ app.post("/upload-students", upload.single("file"), async (req, res) => {
             grade: normalizedGrade,
           });
 
-          if (isNewStudent) newStudentsCount += 1;
+          newStudentsCount += 1;
           insertedCount += 1;
           console.log(`[NEW] Student: "${fullName}" (${email}), course: "${offeringTitle}" — newStudents: ${newStudentsCount}, totalCourseRecords: ${insertedCount}`);
         }
@@ -975,6 +1106,30 @@ app.post("/pending-confirmations/:id/create-student", async (req, res) => {
 
     const pending = pendingRes.rows[0];
 
+    // Guard: reject if a student with the same name + same phone already exists.
+    // Same name + same phone = same person (just a different email on record).
+    // Creating a second record would be a duplicate — the admin should merge instead.
+    if (pending.imported_phone) {
+      const phoneConflict = await pool.query(
+        `
+        SELECT id, name, email, phone
+        FROM Student
+        WHERE LOWER(TRIM(name)) = LOWER(TRIM($1))
+          AND TRIM(phone) = TRIM($2)
+        LIMIT 1
+        `,
+        [pending.imported_name, pending.imported_phone]
+      );
+
+      if (phoneConflict.rowCount > 0) {
+        const conflict = phoneConflict.rows[0];
+        return res.status(409).json({
+          error: `A student named "${conflict.name}" with phone ${conflict.phone} already exists (ID ${conflict.id}, email: ${conflict.email}). Use "Merge to Existing Student" instead.`,
+          conflictStudentId: conflict.id,
+        });
+      }
+    }
+
     const studentRes = await pool.query(
       `
       INSERT INTO Student (name, email, phone)
@@ -1018,6 +1173,97 @@ app.post("/pending-confirmations/:id/create-student", async (req, res) => {
           "A student with this email already exists. Use 'Merge to Existing Student' instead, or correct the email in the source data and re-import.",
       });
     }
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Merge two existing student records: move everything from `sourceId` into `targetId`,
+// then delete the source student. Used to clean up duplicates.
+app.post("/students/:targetId/merge-from/:sourceId", async (req, res) => {
+  const { targetId, sourceId } = req.params;
+
+  if (String(targetId) === String(sourceId)) {
+    return res.status(400).json({ error: "Source and target must be different students" });
+  }
+
+  try {
+    const [targetRes, sourceRes] = await Promise.all([
+      pool.query(`SELECT id, name, email, phone, alt_phones, alt_emails FROM Student WHERE id = $1 LIMIT 1`, [targetId]),
+      pool.query(`SELECT id, name, email, phone, alt_phones, alt_emails FROM Student WHERE id = $1 LIMIT 1`, [sourceId]),
+    ]);
+
+    if (targetRes.rowCount === 0) return res.status(404).json({ error: "Target student not found" });
+    if (sourceRes.rowCount === 0) return res.status(404).json({ error: "Source student not found" });
+
+    const target = targetRes.rows[0];
+    const source = sourceRes.rows[0];
+
+    // Collect every phone/email from the source that the target doesn't already have
+    const sourcePhones = [source.phone, ...(source.alt_phones || [])].filter(Boolean);
+    const sourceEmails = [source.email, ...(source.alt_emails || [])].filter(Boolean);
+
+    for (const phone of sourcePhones) {
+      await addAltPhone(target.id, phone);
+    }
+    for (const email of sourceEmails) {
+      await addAltEmail(target.id, email);
+    }
+
+    // Re-assign all course history rows from source → target (skip exact duplicates)
+    const sourceCourses = await pool.query(
+      `SELECT course_id, begin_date, completion_date, status, grade FROM CourseHistory WHERE student_id = $1`,
+      [source.id]
+    );
+
+    for (const row of sourceCourses.rows) {
+      const alreadyExists = await hasDuplicateCourseHistory({
+        studentId: target.id,
+        courseId: row.course_id,
+        beginDate: row.begin_date,
+        completionDate: row.completion_date,
+        status: row.status,
+        grade: row.grade,
+      });
+      if (!alreadyExists) {
+        await insertCourseHistory({
+          studentId: target.id,
+          courseId: row.course_id,
+          beginDate: row.begin_date,
+          completionDate: row.completion_date,
+          status: row.status,
+          grade: row.grade,
+        });
+      }
+    }
+
+    // Update any pending confirmations that pointed at the source student
+    await pool.query(
+      `UPDATE PendingStudentConfirmation SET matched_student_id = $1 WHERE matched_student_id = $2`,
+      [target.id, source.id]
+    );
+
+    // Delete the source student (course history was already re-assigned above)
+    await pool.query(`DELETE FROM CourseHistory WHERE student_id = $1`, [source.id]);
+    await pool.query(`DELETE FROM Student WHERE id = $1`, [source.id]);
+
+    const requesterId = req.headers["x-user-id"];
+    await logActivity(
+      requesterId || null,
+      "STUDENTS_MERGED",
+      `Merged student ID ${source.id} ("${source.name}", ${source.email}) into student ID ${target.id} ("${target.name}", ${target.email})`
+    );
+
+    // Return the updated target student
+    const updatedTarget = await pool.query(
+      `SELECT id, name, email, phone, alt_phones, alt_emails FROM Student WHERE id = $1`,
+      [target.id]
+    );
+
+    res.json({
+      message: `Student "${source.name}" (ID ${source.id}) merged into "${target.name}" (ID ${target.id})`,
+      student: updatedTarget.rows[0],
+    });
+  } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });

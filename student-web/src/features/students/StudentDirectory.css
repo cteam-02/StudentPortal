@@ -623,3 +623,119 @@
     content: "Action";
   }
 }
+
+/* ── Duplicate student banner ─────────────────────────────────────────── */
+.directory-duplicate-banner {
+  margin: 0 0 18px;
+  background: #fffbf0;
+  border: 1.5px solid #f5c842;
+  border-radius: 12px;
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.directory-duplicate-banner-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  color: #7a5c00;
+}
+
+.directory-duplicate-banner-title svg {
+  color: #e6a800;
+  flex-shrink: 0;
+}
+
+.directory-duplicate-banner-title strong {
+  font-weight: 700;
+}
+
+.directory-duplicate-banner-title span {
+  color: #a07a20;
+}
+
+.directory-duplicate-group {
+  background: #fff;
+  border: 1px solid #f0e0a0;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.directory-duplicate-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  border-bottom: 1px solid #faf0d0;
+}
+
+.directory-duplicate-row:last-child {
+  border-bottom: none;
+}
+
+.directory-duplicate-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+  min-width: 0;
+}
+
+.directory-duplicate-info strong {
+  color: #1e2d45;
+  font-weight: 700;
+}
+
+.directory-duplicate-info span {
+  color: #6b7f99;
+}
+
+.directory-duplicate-phone {
+  font-family: monospace;
+  background: #f2f6fc;
+  padding: 2px 7px;
+  border-radius: 4px;
+  font-size: 12px !important;
+  color: #4a5e78 !important;
+}
+
+.directory-keep-label,
+.directory-duplicate-keep-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #3b7c3b;
+  background: #eaf7ea;
+  padding: 3px 9px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.directory-merge-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 6px;
+  background: #fff3cd;
+  border: 1px solid #e6c200;
+  color: #7a5c00;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s;
+}
+
+.directory-merge-btn:hover:not(:disabled) {
+  background: #ffe680;
+}
+
+.directory-merge-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}

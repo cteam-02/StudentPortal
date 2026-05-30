@@ -1,10 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import {
+  AlertTriangle,
   CalendarDays,
   ChevronLeft,
   ChevronRight,
+  GitMerge,
   SlidersHorizontal,
 } from "lucide-react";
+import { toast, ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 import AppHeader from "../../app/components/AppHeader/AppHeader.jsx";
 import "./StudentDirectory.css";
 
@@ -21,6 +25,8 @@ function StudentDirectory({
   onViewProfile,
 }) {
   const [students, setStudents] = useState([]);
+  const [duplicateGroups, setDuplicateGroups] = useState([]);
+  const [mergingPair, setMergingPair] = useState(null); // { keepId, removeId }
   const [query, setQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState("All");
@@ -77,6 +83,15 @@ function StudentDirectory({
         );
 
         setStudents(studentsWithHistory);
+
+        // Also fetch duplicate groups (same name + same phone)
+        try {
+          const dupRes = await fetch(`${API_BASE_URL}/students/duplicates`);
+          const dupData = await dupRes.json();
+          setDuplicateGroups(Array.isArray(dupData) ? dupData : []);
+        } catch {
+          setDuplicateGroups([]);
+        }
       } catch (error) {
         console.error("Error fetching students:", error);
         setStudents([]);
@@ -87,6 +102,36 @@ function StudentDirectory({
 
     fetchDirectoryData();
   }, []);
+
+  const handleMergeStudents = async (keepId, removeId) => {
+    try {
+      setMergingPair({ keepId, removeId });
+      const response = await fetch(
+        `${API_BASE_URL}/students/${keepId}/merge-from/${removeId}`,
+        {
+          method: "POST",
+          headers: { "x-user-id": String(currentUser?.id ?? "") },
+        }
+      );
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Merge failed");
+
+      toast.success(result.message || "Students merged successfully");
+
+      // Refresh both the student list and duplicate groups
+      setStudents((prev) => prev.filter((s) => s.id !== removeId));
+      setDuplicateGroups((prev) =>
+        prev
+          .map((group) => group.filter((s) => s.id !== removeId))
+          .filter((group) => group.length > 1)
+      );
+    } catch (error) {
+      console.error("Merge error:", error);
+      toast.error(error.message || "Failed to merge students");
+    } finally {
+      setMergingPair(null);
+    }
+  };
 
   const courseOptions = useMemo(() => {
     const titles = new Set();
@@ -151,6 +196,7 @@ function StudentDirectory({
 
   return (
     <div className="directory-shell">
+      <ToastContainer position="top-right" autoClose={4000} />
       <AppHeader
         currentSection="students"
         currentUser={currentUser}
@@ -180,6 +226,52 @@ function StudentDirectory({
             <span>Total Students</span>
           </div>
         </section>
+
+        {duplicateGroups.length > 0 && (
+          <section className="directory-duplicate-banner">
+            <div className="directory-duplicate-banner-title">
+              <AlertTriangle size={15} />
+              <strong>
+                {duplicateGroups.length} duplicate group{duplicateGroups.length !== 1 ? "s" : ""} detected
+              </strong>
+              <span>— students sharing the same name and phone number</span>
+            </div>
+
+            {duplicateGroups.map((group, groupIndex) => (
+              <div key={groupIndex} className="directory-duplicate-group">
+                {group.map((student, studentIndex) => (
+                  <div key={student.id} className="directory-duplicate-row">
+                    <div className="directory-duplicate-info">
+                      <strong>{student.name}</strong>
+                      <span>{student.email}</span>
+                      <span className="directory-duplicate-phone">{student.phone}</span>
+                    </div>
+                    {studentIndex > 0 && (
+                      <button
+                        type="button"
+                        className="directory-merge-btn"
+                        disabled={mergingPair !== null}
+                        onClick={() =>
+                          handleMergeStudents(group[0].id, student.id)
+                        }
+                      >
+                        <GitMerge size={13} />
+                        <span>
+                          {mergingPair?.removeId === student.id
+                            ? "Merging…"
+                            : `Merge into ${group[0].name} (${group[0].email})`}
+                        </span>
+                      </button>
+                    )}
+                    {studentIndex === 0 && (
+                      <span className="directory-duplicate-keep-label">Keep (primary)</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ))}
+          </section>
+        )}
 
         <section className="directory-filter-bar">
           <div className="directory-filters">
