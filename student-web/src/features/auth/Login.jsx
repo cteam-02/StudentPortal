@@ -83,6 +83,7 @@ function LoginCard({ onLoginSuccess }) {
   );
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -108,8 +109,7 @@ function LoginCard({ onLoginSuccess }) {
       setError("Unable to connect to server. Please try again.");
     } finally {
       setIsLoading(false);
-      onLoginSuccess?.();
-    }, 700);
+    }
   };
 
   return (
@@ -153,7 +153,11 @@ function LoginCard({ onLoginSuccess }) {
 
         <div className="login-options">
           <label className="login-remember">
-            <input type="checkbox" />
+            <input
+              type="checkbox"
+              checked={remember}
+              onChange={(e) => setRemember(e.target.checked)}
+            />
             <span>Remember Me</span>
           </label>
           <a href="#" className="login-forgot-link">
