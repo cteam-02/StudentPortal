@@ -5,6 +5,7 @@ require("dotenv").config();
 const multer = require("multer");
 const csv = require("csv-parser");
 const fs = require("fs");
+const bcrypt = require("bcrypt");
 
 const app = express();
 app.use(cors());
@@ -30,6 +31,73 @@ const normalizeField = (value) => {
 };
 
 const normalizeText = (value) => normalizeField(value)?.toLowerCase() || null;
+
+async function ensurePortalUserTable() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS PortalUser (
+      id SERIAL PRIMARY KEY,
+      name TEXT NOT NULL,
+      email TEXT NOT NULL UNIQUE,
+      password_hash TEXT NOT NULL,
+      role TEXT NOT NULL DEFAULT 'admin',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+
+  const existing = await pool.query(
+    `SELECT id FROM PortalUser WHERE LOWER(email) = $1 LIMIT 1`,
+    ["cteam02@kugan.com"]
+  );
+
+  if (existing.rowCount === 0) {
+    const hash = await bcrypt.hash("Admin@2024", 10);
+    await pool.query(
+      `INSERT INTO PortalUser (name, email, password_hash, role) VALUES ($1, $2, $3, $4)`,
+      ["Super Admin", "cteam02@kugan.com", hash, "super_admin"]
+    );
+    console.log("Super admin seeded: cteam02@kugan.com / Admin@2024");
+  }
+}
+
+async function ensureUserActivityLogTable() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS UserActivityLog (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER REFERENCES PortalUser(id) ON DELETE SET NULL,
+      user_name TEXT,
+      user_email TEXT,
+      action TEXT NOT NULL,
+      details TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+}
+
+async function logActivity(userId, action, details = null) {
+  try {
+    let userName = null;
+    let userEmail = null;
+
+    if (userId) {
+      const userRes = await pool.query(
+        `SELECT name, email FROM PortalUser WHERE id = $1 LIMIT 1`,
+        [userId]
+      );
+      if (userRes.rowCount > 0) {
+        userName = userRes.rows[0].name;
+        userEmail = userRes.rows[0].email;
+      }
+    }
+
+    await pool.query(
+      `INSERT INTO UserActivityLog (user_id, user_name, user_email, action, details)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [userId || null, userName, userEmail, action, details]
+    );
+  } catch (err) {
+    console.error("Failed to log activity:", err.message);
+  }
+}
 
 async function ensurePendingConfirmationTable() {
   await pool.query(`
@@ -189,6 +257,102 @@ app.get("/", (req, res) => {
   res.send("Student API is running");
 });
 
+app.get("/stats", async (req, res) => {
+  try {
+    const [studentsRes, enrollmentsRes, pendingRes, coursesRes] = await Promise.all([
+      pool.query("SELECT COUNT(*) FROM Student"),
+      pool.query("SELECT COUNT(*) FROM CourseHistory"),
+      pool.query("SELECT COUNT(*) FROM PendingStudentConfirmation WHERE resolution_status = 'pending'"),
+      pool.query("SELECT COUNT(*) FROM Course"),
+    ]);
+    res.json({
+      totalStudents: parseInt(studentsRes.rows[0].count),
+      totalEnrollments: parseInt(enrollmentsRes.rows[0].count),
+      pendingConfirmations: parseInt(pendingRes.rows[0].count),
+      totalCourses: parseInt(coursesRes.rows[0].count),
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post("/auth/login", async (req, res) => {
+  const { email, password } = req.body;
+  if (!email || !password) {
+    return res.status(400).json({ error: "Email and password are required" });
+  }
+  try {
+    const result = await pool.query(
+      `SELECT id, name, email, role, password_hash FROM PortalUser WHERE LOWER(email) = LOWER($1) LIMIT 1`,
+      [email]
+    );
+    if (result.rowCount === 0) {
+      await logActivity(null, "LOGIN_FAILED", `Failed login attempt for email: ${email}`);
+      return res.status(401).json({ error: "Invalid credentials" });
+    }
+    const user = result.rows[0];
+    const match = await bcrypt.compare(password, user.password_hash);
+    if (!match) {
+      await logActivity(user.id, "LOGIN_FAILED", `Incorrect password for: ${email}`);
+      return res.status(401).json({ error: "Invalid credentials" });
+    }
+    await logActivity(user.id, "LOGIN_SUCCESS", `Logged in as ${user.role}`);
+    res.json({ id: user.id, name: user.name, email: user.email, role: user.role });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get("/auth/users", async (req, res) => {
+  const requesterId = req.headers["x-user-id"];
+  try {
+    const authCheck = await pool.query(
+      `SELECT role FROM PortalUser WHERE id = $1 LIMIT 1`,
+      [requesterId]
+    );
+    if (authCheck.rowCount === 0 || authCheck.rows[0].role !== "super_admin") {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+    const result = await pool.query(
+      `SELECT id, name, email, role, created_at FROM PortalUser ORDER BY id`
+    );
+    res.json(result.rows);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post("/auth/users", async (req, res) => {
+  const requesterId = req.headers["x-user-id"];
+  const { name, email, password, role } = req.body;
+  if (!name || !email || !password) {
+    return res.status(400).json({ error: "Name, email, and password are required" });
+  }
+  try {
+    const authCheck = await pool.query(
+      `SELECT role FROM PortalUser WHERE id = $1 LIMIT 1`,
+      [requesterId]
+    );
+    if (authCheck.rowCount === 0 || authCheck.rows[0].role !== "super_admin") {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+    const hash = await bcrypt.hash(password, 10);
+    const result = await pool.query(
+      `INSERT INTO PortalUser (name, email, password_hash, role)
+       VALUES ($1, $2, $3, $4)
+       RETURNING id, name, email, role, created_at`,
+      [name, email, hash, role || "admin"]
+    );
+    await logActivity(requesterId, "USER_CREATED", `Created portal user: ${email} (${role || "admin"})`);
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    if (error.code === "23505") {
+      return res.status(409).json({ error: "A user with that email already exists" });
+    }
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.get("/students", async (req, res) => {
   try {
     const result = await pool.query("SELECT * FROM Student ORDER BY id");
@@ -276,6 +440,7 @@ app.get("/pending-confirmations", async (req, res) => {
 app.post("/upload-students", upload.single("file"), async (req, res) => {
   const results = [];
   let insertedCount = 0;
+  let newStudentsCount = 0;
   let skippedDuplicates = 0;
   let pendingConfirmations = 0;
 
@@ -351,12 +516,7 @@ app.post("/upload-students", upload.single("file"), async (req, res) => {
 
             if (isDuplicate) {
               skippedDuplicates += 1;
-              console.log("Skipping duplicate CourseHistory row", {
-                studentId,
-                courseId,
-                beginDate,
-                completionDate,
-              });
+              console.log(`[SKIP] Duplicate course history — student: "${fullName}" (${email}), course: "${offeringTitle}", studentId: ${studentId}`);
               continue;
             }
 
@@ -454,12 +614,7 @@ app.post("/upload-students", upload.single("file"), async (req, res) => {
 
             if (duplicatePendingRes.rowCount > 0) {
               skippedDuplicates += 1;
-              console.log("Skipping duplicate pending confirmation row", {
-                matchedStudentId,
-                courseId,
-                beginDate,
-                completionDate,
-              });
+              console.log(`[SKIP] Duplicate pending confirmation — student: "${fullName}" (${email}), course: "${offeringTitle}", matchedStudentId: ${matchedStudentId}`);
               continue;
             }
 
@@ -505,6 +660,12 @@ app.post("/upload-students", upload.single("file"), async (req, res) => {
             continue;
           }
 
+          const existingCheck = await pool.query(
+            `SELECT id FROM Student WHERE LOWER(TRIM(email)) = LOWER(TRIM($1)) LIMIT 1`,
+            [email]
+          );
+          const isNewStudent = existingCheck.rowCount === 0;
+
           const studentRes = await pool.query(
             `
             INSERT INTO Student (name, email, phone)
@@ -527,17 +688,21 @@ app.post("/upload-students", upload.single("file"), async (req, res) => {
             grade: normalizedGrade,
           });
 
+          if (isNewStudent) newStudentsCount += 1;
           insertedCount += 1;
-          console.log("CourseHistory row inserted successfully", {
-            insertedRow: insertHistoryRes.rows[0],
-            insertedCount,
-            skippedDuplicates,
-          });
+          console.log(`[NEW] Student: "${fullName}" (${email}), course: "${offeringTitle}" — newStudents: ${newStudentsCount}, totalCourseRecords: ${insertedCount}`);
         }
 
+        const requesterId = req.headers["x-user-id"];
+        await logActivity(
+          requesterId || null,
+          "CSV_IMPORT",
+          `Imported ${newStudentsCount} new students, ${insertedCount} course records, skipped ${skippedDuplicates} duplicates, ${pendingConfirmations} pending confirmations (${results.length} total rows processed)`
+        );
         res.json({
           message: "Students & courses imported successfully 🎉",
           processedRows: results.length,
+          newStudents: newStudentsCount,
           insertedRows: insertedCount,
           skippedDuplicates,
           pendingConfirmations,
@@ -602,6 +767,12 @@ app.post("/pending-confirmations/:id/merge", async (req, res) => {
       [pendingId]
     );
 
+    const mergeRequesterId = req.headers["x-user-id"];
+    await logActivity(
+      mergeRequesterId || null,
+      "PENDING_MERGED",
+      `Merged pending confirmation #${pendingId} into student ID ${targetStudentId}`
+    );
     res.json({ message: "Pending confirmation merged successfully" });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -656,6 +827,12 @@ app.post("/pending-confirmations/:id/create-student", async (req, res) => {
       [pendingId]
     );
 
+    const createRequesterId = req.headers["x-user-id"];
+    await logActivity(
+      createRequesterId || null,
+      "STUDENT_CREATED_FROM_PENDING",
+      `Created new student "${pending.imported_name}" (${pending.imported_email}) from pending confirmation #${pendingId}`
+    );
     res.json({ message: "New student created from pending confirmation" });
   } catch (error) {
     if (error.code === "23505" && error.constraint === "student_email_key") {
@@ -668,12 +845,42 @@ app.post("/pending-confirmations/:id/create-student", async (req, res) => {
   }
 });
 
+app.get("/auth/activity-logs", async (req, res) => {
+  const requesterId = req.headers["x-user-id"];
+  try {
+    const authCheck = await pool.query(
+      `SELECT role FROM PortalUser WHERE id = $1 LIMIT 1`,
+      [requesterId]
+    );
+    if (authCheck.rowCount === 0 || authCheck.rows[0].role !== "super_admin") {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+    const limit = Math.min(parseInt(req.query.limit) || 100, 500);
+    const result = await pool.query(
+      `SELECT id, user_id, user_name, user_email, action, details, created_at
+       FROM UserActivityLog
+       ORDER BY created_at DESC
+       LIMIT $1`,
+      [limit]
+    );
+    res.json(result.rows);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.delete("/students", async (req, res) => {
   try {
     await pool.query("DELETE FROM PendingStudentConfirmation");
     await pool.query("DELETE FROM CourseHistory");
     const result = await pool.query("DELETE FROM Student");
 
+    const deleteRequesterId = req.headers["x-user-id"];
+    await logActivity(
+      deleteRequesterId || null,
+      "ALL_DATA_DELETED",
+      `Deleted all student data — ${result.rowCount} students removed`
+    );
     res.json({
       message: "All student data deleted successfully",
       deletedStudents: result.rowCount,
@@ -685,7 +892,7 @@ app.delete("/students", async (req, res) => {
 
 const port = process.env.PORT || 3000;
 
-ensurePendingConfirmationTable()
+Promise.all([ensurePendingConfirmationTable(), ensurePortalUserTable(), ensureUserActivityLogTable()])
   .then(() => {
     app.listen(port, () => {
       console.log(`Server running on http://localhost:${port}`);

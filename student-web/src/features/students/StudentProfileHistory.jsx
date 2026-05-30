@@ -9,11 +9,13 @@ import "./StudentProfileHistory.css";
 const API_BASE_URL = "http://localhost:3000";
 
 function StudentProfileHistory({
+  currentUser,
   student,
   onOpenDashboard,
   onOpenStudents,
   onOpenCourses,
   onOpenPending,
+  onOpenUsers,
   onLogout,
 }) {
   const displayName = student?.name || "Student";
@@ -86,12 +88,14 @@ function StudentProfileHistory({
     <div className="profile-shell">
       <AppHeader
         currentSection="students"
+        currentUser={currentUser}
         onOpenDashboard={onOpenDashboard}
         onOpenStudents={onOpenStudents}
         onOpenCourses={onOpenCourses}
         onOpenPending={onOpenPending}
-        searchPlaceholder="Search students..."
+        onOpenUsers={onOpenUsers}
         onLogout={onLogout}
+        searchPlaceholder="Search students..."
       />
 
       <main className="profile-main">

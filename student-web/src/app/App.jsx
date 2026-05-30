@@ -13,9 +13,25 @@ import StudentProfileHistory from "../features/students/StudentProfileHistory.js
 import PendingConfirmations from "../features/students/PendingConfirmations.jsx";
 import CoursesCatalog from "../features/courses/CoursesCatalog.jsx";
 import CourseDetail from "../features/courses/CourseDetail.jsx";
+import UserManagement from "../features/users/UserManagement.jsx";
+
+const SESSION_KEY = "portal_user";
+
+function restoreUser() {
+  try {
+    const raw =
+      localStorage.getItem(SESSION_KEY) ||
+      sessionStorage.getItem(SESSION_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
 
 function App() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(
+    () => localStorage.getItem("rememberMe") === "true"
+  );
   const [focusedStudentId, setFocusedStudentId] = useState(null);
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [selectedCourse, setSelectedCourse] = useState(null);
@@ -30,14 +46,25 @@ function App() {
     return location.state?.course || selectedCourse;
   }, [location.state, selectedCourse]);
 
-  const handleLoginSuccess = () => {
+  const handleLoginSuccess = (rememberMe) => {
+    if (rememberMe) {
+      localStorage.setItem("rememberMe", "true");
+    } else {
+      localStorage.removeItem("rememberMe");
+    }
     setIsLoggedIn(true);
     navigate("/dashboard", { replace: true });
   };
 
   const handleLogout = () => {
-    setIsLoggedIn(false);
+    setCurrentUser(null);
+    localStorage.removeItem(SESSION_KEY);
+    sessionStorage.removeItem(SESSION_KEY);
     navigate("/login", { replace: true });
+  };
+
+  const openUsers = () => {
+    navigate("/users");
   };
 
   const openDashboard = () => {
@@ -121,13 +148,15 @@ function App() {
         element={
           <ProtectedRoute isLoggedIn={isLoggedIn}>
             <StudentDashboard
+              currentUser={currentUser}
               onOpenStudents={openStudents}
               onOpenCourses={openCourses}
               onOpenPending={openPending}
+              onOpenUsers={openUsers}
+              onLogout={handleLogout}
               onOpenProfile={openProfile}
               focusedStudentId={focusedStudentId}
               onFocusedStudentHandled={clearFocusedStudent}
-              onLogout={handleLogout}
             />
           </ProtectedRoute>
         }
@@ -138,11 +167,13 @@ function App() {
         element={
           <ProtectedRoute isLoggedIn={isLoggedIn}>
             <StudentDirectory
+              currentUser={currentUser}
               onOpenDashboard={openDashboard}
               onOpenCourses={openCourses}
               onOpenPending={openPending}
-              onViewProfile={handleViewProfile}
+              onOpenUsers={openUsers}
               onLogout={handleLogout}
+              onViewProfile={handleViewProfile}
             />
           </ProtectedRoute>
         }
@@ -153,11 +184,13 @@ function App() {
         element={
           <ProtectedRoute isLoggedIn={isLoggedIn}>
             <StudentProfileHistory
+              currentUser={currentUser}
               student={routeStudent}
               onOpenDashboard={openDashboard}
               onOpenStudents={openStudents}
               onOpenCourses={openCourses}
               onOpenPending={openPending}
+              onOpenUsers={openUsers}
               onLogout={handleLogout}
             />
           </ProtectedRoute>
@@ -169,11 +202,13 @@ function App() {
         element={
           <ProtectedRoute isLoggedIn={isLoggedIn}>
             <PendingConfirmations
+              currentUser={currentUser}
               onOpenDashboard={openDashboard}
               onOpenStudents={openStudents}
               onOpenCourses={openCourses}
-              onViewProfile={handleViewProfile}
+              onOpenUsers={openUsers}
               onLogout={handleLogout}
+              onViewProfile={handleViewProfile}
             />
           </ProtectedRoute>
         }
@@ -184,11 +219,13 @@ function App() {
         element={
           <ProtectedRoute isLoggedIn={isLoggedIn}>
             <CoursesCatalog
+              currentUser={currentUser}
               onOpenDashboard={openDashboard}
               onOpenStudents={openStudents}
               onOpenPending={openPending}
-              onOpenCourseDetail={openCourseDetail}
+              onOpenUsers={openUsers}
               onLogout={handleLogout}
+              onOpenCourseDetail={openCourseDetail}
             />
           </ProtectedRoute>
         }
@@ -199,11 +236,30 @@ function App() {
         element={
           <ProtectedRoute isLoggedIn={isLoggedIn}>
             <CourseDetail
+              currentUser={currentUser}
               course={routeCourse}
               onOpenDashboard={openDashboard}
               onOpenStudents={openStudents}
               onOpenCourses={openCourses}
               onOpenPending={openPending}
+              onOpenUsers={openUsers}
+              onLogout={handleLogout}
+            />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/users"
+        element={
+          <ProtectedRoute isLoggedIn={isLoggedIn}>
+            <UserManagement
+              currentUser={currentUser}
+              onOpenDashboard={openDashboard}
+              onOpenStudents={openStudents}
+              onOpenCourses={openCourses}
+              onOpenPending={openPending}
+              onOpenUsers={openUsers}
               onLogout={handleLogout}
             />
           </ProtectedRoute>
