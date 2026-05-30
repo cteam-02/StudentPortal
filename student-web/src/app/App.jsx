@@ -15,9 +15,7 @@ import CoursesCatalog from "../features/courses/CoursesCatalog.jsx";
 import CourseDetail from "../features/courses/CourseDetail.jsx";
 
 function App() {
-  const [isLoggedIn, setIsLoggedIn] = useState(
-    () => localStorage.getItem("rememberMe") === "true"
-  );
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [focusedStudentId, setFocusedStudentId] = useState(null);
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [selectedCourse, setSelectedCourse] = useState(null);
@@ -32,14 +30,14 @@ function App() {
     return location.state?.course || selectedCourse;
   }, [location.state, selectedCourse]);
 
-  const handleLoginSuccess = (rememberMe) => {
-    if (rememberMe) {
-      localStorage.setItem("rememberMe", "true");
-    } else {
-      localStorage.removeItem("rememberMe");
-    }
+  const handleLoginSuccess = () => {
     setIsLoggedIn(true);
     navigate("/dashboard", { replace: true });
+  };
+
+  const handleLogout = () => {
+    setIsLoggedIn(false);
+    navigate("/login", { replace: true });
   };
 
   const openDashboard = () => {
@@ -129,6 +127,7 @@ function App() {
               onOpenProfile={openProfile}
               focusedStudentId={focusedStudentId}
               onFocusedStudentHandled={clearFocusedStudent}
+              onLogout={handleLogout}
             />
           </ProtectedRoute>
         }
@@ -143,6 +142,7 @@ function App() {
               onOpenCourses={openCourses}
               onOpenPending={openPending}
               onViewProfile={handleViewProfile}
+              onLogout={handleLogout}
             />
           </ProtectedRoute>
         }
@@ -158,6 +158,7 @@ function App() {
               onOpenStudents={openStudents}
               onOpenCourses={openCourses}
               onOpenPending={openPending}
+              onLogout={handleLogout}
             />
           </ProtectedRoute>
         }
@@ -172,6 +173,7 @@ function App() {
               onOpenStudents={openStudents}
               onOpenCourses={openCourses}
               onViewProfile={handleViewProfile}
+              onLogout={handleLogout}
             />
           </ProtectedRoute>
         }
@@ -186,6 +188,7 @@ function App() {
               onOpenStudents={openStudents}
               onOpenPending={openPending}
               onOpenCourseDetail={openCourseDetail}
+              onLogout={handleLogout}
             />
           </ProtectedRoute>
         }
@@ -201,6 +204,7 @@ function App() {
               onOpenStudents={openStudents}
               onOpenCourses={openCourses}
               onOpenPending={openPending}
+              onLogout={handleLogout}
             />
           </ProtectedRoute>
         }

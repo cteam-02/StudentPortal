@@ -8,6 +8,7 @@ function CourseDetail({
   onOpenStudents,
   onOpenCourses,
   onOpenPending,
+  onLogout,
 }) {
   const title = course?.title || "Untitled course";
   const descriptionHtml =
@@ -35,6 +36,7 @@ function CourseDetail({
         onOpenCourses={onOpenCourses}
         onOpenPending={onOpenPending}
         searchPlaceholder="Search courses..."
+        onLogout={onLogout}
       />
 
       <main className="course-detail-main">

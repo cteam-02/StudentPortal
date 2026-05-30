@@ -60,6 +60,7 @@ function Header() {
 
       <div className="login-header-actions">
         <nav className="login-nav">
+          <a href="#">Portal Home</a>
           <a href="#">Support</a>
         </nav>
         <button type="button" className="login-contact-btn">
@@ -73,7 +74,6 @@ function Header() {
 function LoginCard({ onLoginSuccess }) {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [rememberMe, setRememberMe] = useState(false);
 
   const handleSubmit = (event) => {
     event.preventDefault();
@@ -81,7 +81,7 @@ function LoginCard({ onLoginSuccess }) {
 
     setTimeout(() => {
       setIsLoading(false);
-      onLoginSuccess?.(rememberMe);
+      onLoginSuccess?.();
     }, 700);
   };
 
@@ -120,11 +120,7 @@ function LoginCard({ onLoginSuccess }) {
 
         <div className="login-options">
           <label className="login-remember">
-            <input
-              type="checkbox"
-              checked={rememberMe}
-              onChange={(e) => setRememberMe(e.target.checked)}
-            />
+            <input type="checkbox" />
             <span>Remember Me</span>
           </label>
           <a href="#" className="login-forgot-link">

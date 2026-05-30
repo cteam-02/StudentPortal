@@ -14,6 +14,7 @@ function StudentProfileHistory({
   onOpenStudents,
   onOpenCourses,
   onOpenPending,
+  onLogout,
 }) {
   const displayName = student?.name || "Student";
   const displayEmail = student?.email || "No email available";
@@ -90,6 +91,7 @@ function StudentProfileHistory({
         onOpenCourses={onOpenCourses}
         onOpenPending={onOpenPending}
         searchPlaceholder="Search students..."
+        onLogout={onLogout}
       />
 
       <main className="profile-main">

@@ -12,6 +12,7 @@ function PendingConfirmations({
   onOpenStudents,
   onOpenCourses,
   onViewProfile,
+  onLogout,
 }) {
   const [query, setQuery] = useState("");
   const [pendingRows, setPendingRows] = useState([]);
@@ -108,6 +109,7 @@ function PendingConfirmations({
         searchPlaceholder="Search pending confirmations..."
         searchValue={query}
         onSearchChange={setQuery}
+        onLogout={onLogout}
       />
 
       <main className="pending-main">

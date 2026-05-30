@@ -1,4 +1,4 @@
-import { GraduationCap, Search, UserRound } from "lucide-react";
+import { GraduationCap, LogOut, Search, UserRound } from "lucide-react";
 import "./AppHeader.css";
 
 function AppHeader({
@@ -7,6 +7,7 @@ function AppHeader({
   onOpenStudents,
   onOpenCourses,
   onOpenPending,
+  onLogout,
   searchPlaceholder = "Search...",
   searchValue = "",
   onSearchChange,
@@ -79,6 +80,13 @@ function AppHeader({
             <span>Student Records</span>
           </div>
         </div>
+
+        {onLogout && (
+          <button type="button" className="app-header-logout-btn" onClick={onLogout}>
+            <LogOut size={15} />
+            <span>Logout</span>
+          </button>
+        )}
       </div>
     </header>
   );

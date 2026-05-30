@@ -113,6 +113,30 @@
   font-size: 12px;
 }
 
+.app-header-logout-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 12px;
+  border: 1px solid #e2e8f4;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #6d7d96;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.app-header-logout-btn:hover {
+  background: #fff2f2;
+  color: #d94f4f;
+  border-color: #f5c6c6;
+}
+
 @media (max-width: 920px) {
   .app-header {
     height: auto;

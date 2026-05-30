@@ -17,6 +17,7 @@ function StudentDirectory({
   onOpenCourses,
   onOpenPending,
   onViewProfile,
+  onLogout,
 }) {
   const [students, setStudents] = useState([]);
   const [query, setQuery] = useState("");
@@ -158,6 +159,7 @@ function StudentDirectory({
         searchPlaceholder="Search by name, email, or phone"
         searchValue={query}
         onSearchChange={setQuery}
+        onLogout={onLogout}
       />
 
       <main className="directory-main">
