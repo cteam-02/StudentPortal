@@ -82,7 +82,7 @@
 
 .app-header-user {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 10px;
 }
 
@@ -98,6 +98,17 @@
   color: #35507b;
 }
 
+.app-header-nav-users {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #7c3aed;
+}
+
+.app-header-nav-users.is-active {
+  color: #6d28d9;
+}
+
 .app-header-user strong,
 .app-header-user span {
   display: block;
@@ -111,6 +122,51 @@
 .app-header-user span {
   color: #8a97ab;
   font-size: 12px;
+}
+
+.app-header-role-badge {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: #e8eef8;
+  color: #5a7ab0;
+}
+
+/* Override the generic span rule which would otherwise win on specificity */
+.app-header-user .app-header-role-badge {
+  font-size: 9px;
+}
+
+.app-header-role-badge.is-super {
+  background: #ede9fe;
+  color: #6d28d9;
+}
+
+.app-header-logout-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 7px;
+  background: transparent;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.app-header-logout-btn:hover {
+  background: #fef2f2;
+  color: #dc2626;
+  border-color: #fecaca;
 }
 
 @media (max-width: 920px) {

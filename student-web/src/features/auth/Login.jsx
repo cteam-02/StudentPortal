@@ -9,6 +9,8 @@ import {
 } from "lucide-react";
 import "./Login.css";
 
+const API_BASE_URL = "http://localhost:3000";
+
 export default function Login({ onLoginSuccess }) {
   return (
     <div className="login-screen">
@@ -70,16 +72,41 @@ function Header() {
   );
 }
 
+const REMEMBER_KEY = "portal_remember_me";
+
 function LoginCard({ onLoginSuccess }) {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [remember, setRemember] = useState(
+    () => localStorage.getItem(REMEMBER_KEY) !== "false"
+  );
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault();
+    setError(null);
     setIsLoading(true);
 
-    setTimeout(() => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data.error || "Login failed");
+        return;
+      }
+
+      onLoginSuccess?.(data, remember);
+    } catch {
+      setError("Unable to connect to server. Please try again.");
+    } finally {
       setIsLoading(false);
       onLoginSuccess?.(rememberMe);
     }, 700);
@@ -94,6 +121,8 @@ function LoginCard({ onLoginSuccess }) {
             id="email"
             type="email"
             placeholder="email@kugan.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
             required
           />
         </div>
@@ -105,6 +134,8 @@ function LoginCard({ onLoginSuccess }) {
               id="password"
               type={showPassword ? "text" : "password"}
               placeholder="Enter your password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
               required
             />
             <button
@@ -117,6 +148,8 @@ function LoginCard({ onLoginSuccess }) {
             </button>
           </div>
         </div>
+
+        {error && <p className="login-error">{error}</p>}
 
         <div className="login-options">
           <label className="login-remember">
