@@ -188,6 +188,23 @@ async function findPotentialStudentByAnyTwo(fullName, email, phone) {
   );
 }
 
+// Finds a student whose name matches but BOTH email AND phone differ —
+// the caller treats this as a possible duplicate that needs human review.
+async function findStudentByNameOnlyMismatch(fullName, email, phone) {
+  return pool.query(
+    `
+    SELECT id, name, email, phone
+    FROM Student
+    WHERE LOWER(TRIM(name)) = LOWER(TRIM($1))
+      AND LOWER(TRIM(COALESCE(email, ''))) != LOWER(TRIM(COALESCE($2, '')))
+      AND TRIM(COALESCE(phone, '')) != TRIM(COALESCE($3, ''))
+    ORDER BY id
+    LIMIT 1
+    `,
+    [fullName, email || "", phone || ""]
+  );
+}
+
 async function findCourseByTitle(offeringTitle) {
   return pool.query(
     `
@@ -702,6 +719,64 @@ app.post("/upload-students", upload.single("file"), async (req, res) => {
               courseId,
               beginDate,
               completionDate,
+            });
+            continue;
+          }
+
+          // Name matches but both email AND phone differ — send to pending for human review
+          const nameOnlyRes = await findStudentByNameOnlyMismatch(fullName, email, phone);
+
+          console.log("Name-only match result", {
+            fullName,
+            email,
+            phone,
+            rowCount: nameOnlyRes.rowCount,
+            matchedStudent: nameOnlyRes.rows[0] || null,
+          });
+
+          if (nameOnlyRes.rowCount > 0) {
+            const nameMatchedStudent = nameOnlyRes.rows[0];
+            const nameMatchedStudentId = nameMatchedStudent.id;
+
+            const duplicatePendingRes = await findDuplicatePendingConfirmation({
+              importedName: fullName,
+              importedEmail: email,
+              importedPhone: phone,
+              courseId,
+              beginDate,
+              completionDate,
+              status: normalizedStatus,
+              grade: normalizedGrade,
+              matchedStudentId: nameMatchedStudentId,
+            });
+
+            if (duplicatePendingRes.rowCount > 0) {
+              skippedDuplicates += 1;
+              console.log(`[SKIP] Duplicate pending confirmation (name-only match) — student: "${fullName}", course: "${offeringTitle}"`);
+              continue;
+            }
+
+            await pool.query(
+              `
+              INSERT INTO PendingStudentConfirmation
+                (imported_name, imported_email, imported_phone, offering_title,
+                 course_id, begin_date, completion_date, status, grade, matched_student_id)
+              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+              `,
+              [
+                fullName, email, phone, offeringTitle,
+                courseId, beginDate, completionDate,
+                normalizedStatus, normalizedGrade, nameMatchedStudentId,
+              ]
+            );
+
+            pendingConfirmations += 1;
+            console.log("Pending confirmation created (name-only match)", {
+              fullName,
+              email,
+              phone,
+              nameMatchedStudentId,
+              courseId,
             });
             continue;
           }
