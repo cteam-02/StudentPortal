@@ -498,10 +498,29 @@ app.get("/pending-confirmations", async (req, res) => {
   }
 });
 
-// Upload a CSV file and translate each row into:
-// 1. If name + email + phone + course match, ignore as duplicate.
-// 2. If name + email + phone match but course differs, add new course history.
-// 3. If any two of name + email + phone match, but the third differs, create a pending confirmation row.
+// CSV import decision table (evaluated in order, first match wins):
+//
+//  Tier 1 — EXACT DUPLICATE
+//    name + email + phone + course + dates + status + grade all match
+//    → skip row silently
+//
+//  Tier 2 — EXACT STUDENT, NEW COURSE HISTORY  ← auto-merge
+//    name + email + phone all match,  AND one of:
+//      a) different course
+//      b) same course but different begin or completion date
+//      c) same course + date but different status or grade
+//    → insert new CourseHistory row for the existing student
+//
+//  Tier 3 — TWO-FIELD STUDENT MATCH  ← auto-merge + store alt contact
+//    name + email match, phone differs → merge course history, append alt_phone
+//    name + phone match, email differs → merge course history, append alt_email
+//
+//  Tier 4 — NAME-ONLY MATCH  ← human review
+//    name matches, email AND phone both differ
+//    → create PendingStudentConfirmation record
+//
+//  Tier 5 — NO MATCH
+//    → create new Student + CourseHistory
 app.post("/upload-students", upload.single("file"), async (req, res) => {
   const results = [];
   let insertedCount = 0;
@@ -569,8 +588,12 @@ app.post("/upload-students", upload.single("file"), async (req, res) => {
           });
 
           if (exactStudentRes.rowCount > 0) {
+            // Tier 1 / Tier 2: student identity is a confirmed exact match.
+            // Only skip if the course history record is also identical in every field.
+            // Different course, different date, or any other field change → auto-merge
+            // by adding a new CourseHistory row to this student's record.
             const studentId = exactStudentRes.rows[0].id;
-            const isDuplicate = await hasDuplicateCourseHistory({
+            const isExactDuplicate = await hasDuplicateCourseHistory({
               studentId,
               courseId,
               beginDate,
@@ -579,12 +602,14 @@ app.post("/upload-students", upload.single("file"), async (req, res) => {
               grade: normalizedGrade,
             });
 
-            if (isDuplicate) {
+            if (isExactDuplicate) {
+              // Tier 1: every field is identical — true duplicate, skip silently
               skippedDuplicates += 1;
-              console.log(`[SKIP] Duplicate course history — student: "${fullName}" (${email}), course: "${offeringTitle}", studentId: ${studentId}`);
+              console.log(`[SKIP] Exact duplicate row — student: "${fullName}" (${email}), course: "${offeringTitle}", studentId: ${studentId}`);
               continue;
             }
 
+            // Tier 2: same student, new course history (different course or different date)
             const insertHistoryRes = await insertCourseHistory({
               studentId,
               courseId,
@@ -595,11 +620,7 @@ app.post("/upload-students", upload.single("file"), async (req, res) => {
             });
 
             insertedCount += 1;
-            console.log("CourseHistory row inserted successfully", {
-              insertedRow: insertHistoryRes.rows[0],
-              insertedCount,
-              skippedDuplicates,
-            });
+            console.log(`[MERGE] New course history added — student: "${fullName}" (${email}), course: "${offeringTitle}", studentId: ${studentId}`);
             continue;
           }
 
