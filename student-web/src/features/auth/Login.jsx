@@ -62,7 +62,6 @@ function Header() {
 
       <div className="login-header-actions">
         <nav className="login-nav">
-          <a href="#">Portal Home</a>
           <a href="#">Support</a>
         </nav>
         <button type="button" className="login-contact-btn">
@@ -83,7 +82,7 @@ function LoginCard({ onLoginSuccess }) {
   );
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState(null);
+  const [rememberMe, setRememberMe] = useState(false);
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -109,7 +108,8 @@ function LoginCard({ onLoginSuccess }) {
       setError("Unable to connect to server. Please try again.");
     } finally {
       setIsLoading(false);
-    }
+      onLoginSuccess?.(rememberMe);
+    }, 700);
   };
 
   return (
@@ -155,11 +155,8 @@ function LoginCard({ onLoginSuccess }) {
           <label className="login-remember">
             <input
               type="checkbox"
-              checked={remember}
-              onChange={(e) => {
-                setRemember(e.target.checked);
-                localStorage.setItem(REMEMBER_KEY, String(e.target.checked));
-              }}
+              checked={rememberMe}
+              onChange={(e) => setRememberMe(e.target.checked)}
             />
             <span>Remember Me</span>
           </label>

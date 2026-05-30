@@ -29,8 +29,9 @@ function restoreUser() {
 }
 
 function App() {
-  const [currentUser, setCurrentUser] = useState(() => restoreUser());
-  const isLoggedIn = Boolean(currentUser);
+  const [isLoggedIn, setIsLoggedIn] = useState(
+    () => localStorage.getItem("rememberMe") === "true"
+  );
   const [focusedStudentId, setFocusedStudentId] = useState(null);
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [selectedCourse, setSelectedCourse] = useState(null);
@@ -45,10 +46,13 @@ function App() {
     return location.state?.course || selectedCourse;
   }, [location.state, selectedCourse]);
 
-  const handleLoginSuccess = (user, remember) => {
-    setCurrentUser(user);
-    const storage = remember ? localStorage : sessionStorage;
-    storage.setItem(SESSION_KEY, JSON.stringify(user));
+  const handleLoginSuccess = (rememberMe) => {
+    if (rememberMe) {
+      localStorage.setItem("rememberMe", "true");
+    } else {
+      localStorage.removeItem("rememberMe");
+    }
+    setIsLoggedIn(true);
     navigate("/dashboard", { replace: true });
   };
 

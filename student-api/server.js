@@ -553,7 +553,53 @@ app.post("/upload-students", upload.single("file"), async (req, res) => {
           });
 
           if (potentialStudentRes.rowCount > 0) {
-            const matchedStudentId = potentialStudentRes.rows[0].id;
+            const matchedStudent = potentialStudentRes.rows[0];
+            const matchedStudentId = matchedStudent.id;
+
+            // If the email matches, the identity is certain enough — merge directly
+            // rather than queuing a pending confirmation that would always fail
+            // "Create New Student" due to the unique constraint on email.
+            if (normalizeText(matchedStudent.email) === email) {
+              const isDuplicate = await hasDuplicateCourseHistory({
+                studentId: matchedStudentId,
+                courseId,
+                beginDate,
+                completionDate,
+                status: normalizedStatus,
+                grade: normalizedGrade,
+              });
+
+              if (isDuplicate) {
+                skippedDuplicates += 1;
+                console.log("Skipping duplicate CourseHistory row (email match auto-merge)", {
+                  matchedStudentId,
+                  courseId,
+                  beginDate,
+                  completionDate,
+                });
+                continue;
+              }
+
+              await insertCourseHistory({
+                studentId: matchedStudentId,
+                courseId,
+                beginDate,
+                completionDate,
+                status: normalizedStatus,
+                grade: normalizedGrade,
+              });
+
+              insertedCount += 1;
+              console.log("CourseHistory auto-merged (email matched)", {
+                matchedStudentId,
+                courseId,
+                beginDate,
+                completionDate,
+              });
+              continue;
+            }
+
+            // Only name+phone matched — email differs, so genuinely ambiguous — queue for review
             const duplicatePendingRes = await findDuplicatePendingConfirmation({
               importedName: fullName,
               importedEmail: email,
@@ -789,6 +835,12 @@ app.post("/pending-confirmations/:id/create-student", async (req, res) => {
     );
     res.json({ message: "New student created from pending confirmation" });
   } catch (error) {
+    if (error.code === "23505" && error.constraint === "student_email_key") {
+      return res.status(409).json({
+        error:
+          "A student with this email already exists. Use 'Merge to Existing Student' instead, or correct the email in the source data and re-import.",
+      });
+    }
     res.status(500).json({ error: error.message });
   }
 });
