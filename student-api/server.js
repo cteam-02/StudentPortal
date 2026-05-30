@@ -657,63 +657,51 @@ app.post("/upload-students", upload.single("file"), async (req, res) => {
               continue;
             }
 
-            // Only name+phone matched — email differs, so genuinely ambiguous — queue for review
-            const duplicatePendingRes = await findDuplicatePendingConfirmation({
-              importedName: fullName,
-              importedEmail: email,
-              importedPhone: phone,
+            // Name+phone matched, email differs — auto-merge course history and record the
+            // new email as an alternate email (mirrors the email-match path above)
+            const isPhoneMatchDuplicate = await hasDuplicateCourseHistory({
+              studentId: matchedStudentId,
               courseId,
               beginDate,
               completionDate,
               status: normalizedStatus,
               grade: normalizedGrade,
-              matchedStudentId,
             });
 
-            if (duplicatePendingRes.rowCount > 0) {
+            if (isPhoneMatchDuplicate) {
               skippedDuplicates += 1;
-              console.log(`[SKIP] Duplicate pending confirmation — student: "${fullName}" (${email}), course: "${offeringTitle}", matchedStudentId: ${matchedStudentId}`);
+              console.log("Skipping duplicate CourseHistory row (phone match auto-merge)", {
+                matchedStudentId,
+                courseId,
+              });
               continue;
             }
 
-            await pool.query(
-              `
-              INSERT INTO PendingStudentConfirmation
-                (
-                  imported_name,
-                  imported_email,
-                  imported_phone,
-                  offering_title,
-                  course_id,
-                  begin_date,
-                  completion_date,
-                  status,
-                  grade,
-                  matched_student_id
-                )
-              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-              `,
-              [
-                fullName,
-                email,
-                phone,
-                offeringTitle,
-                courseId,
-                beginDate,
-                completionDate,
-                normalizedStatus,
-                normalizedGrade,
-                matchedStudentId,
-              ]
-            );
+            await insertCourseHistory({
+              studentId: matchedStudentId,
+              courseId,
+              beginDate,
+              completionDate,
+              status: normalizedStatus,
+              grade: normalizedGrade,
+            });
 
-            pendingConfirmations += 1;
-            console.log("Pending confirmation created", {
-              fullName,
-              email,
-              phone,
+            // Email differs from existing — record as an alternate email
+            if (email && normalizeText(matchedStudent.email) !== email) {
+              await addAltEmail(matchedStudentId, email);
+              console.log("Alt email added during auto-merge (phone matched, email differs)", {
+                matchedStudentId,
+                newEmail: email,
+                existingEmail: matchedStudent.email,
+              });
+            }
+
+            insertedCount += 1;
+            console.log("CourseHistory auto-merged (phone matched)", {
               matchedStudentId,
               courseId,
+              beginDate,
+              completionDate,
             });
             continue;
           }
