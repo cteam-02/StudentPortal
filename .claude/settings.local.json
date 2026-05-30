@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(gh auth *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "Bash(gh pr *)",
+      "Bash(gh pr create --title 'Fix CSV import duplicate handling, Remember Me, and login UI cleanup' --body ' *)",
+      "Bash(git show *)",
+      "Bash(cp /tmp/server_original.js /Users/cteam01kugan/Downloads/student_info_project/.claude/worktrees/nostalgic-wiles-1ed9df/student-api/server.js)",
+      "Bash(cp /tmp/Login_original.jsx /Users/cteam01kugan/Downloads/student_info_project/.claude/worktrees/nostalgic-wiles-1ed9df/student-web/src/features/auth/Login.jsx)",
+      "Bash(cp /tmp/CoursesCatalog_original.jsx /Users/cteam01kugan/Downloads/student_info_project/.claude/worktrees/nostalgic-wiles-1ed9df/student-web/src/features/courses/CoursesCatalog.jsx)",
+      "Bash(cp /tmp/CoursesCatalog_original.css /Users/cteam01kugan/Downloads/student_info_project/.claude/worktrees/nostalgic-wiles-1ed9df/student-web/src/features/courses/CoursesCatalog.css)"
+    ]
+  }
+}
