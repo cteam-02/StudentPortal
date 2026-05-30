@@ -119,6 +119,39 @@ async function ensurePendingConfirmationTable() {
   `);
 }
 
+async function ensureStudentAltContactColumns() {
+  await pool.query(
+    `ALTER TABLE Student ADD COLUMN IF NOT EXISTS alt_phones TEXT[] NOT NULL DEFAULT '{}'`
+  );
+  await pool.query(
+    `ALTER TABLE Student ADD COLUMN IF NOT EXISTS alt_emails TEXT[] NOT NULL DEFAULT '{}'`
+  );
+}
+
+async function addAltPhone(studentId, phone) {
+  if (!phone) return;
+  await pool.query(
+    `UPDATE Student
+     SET alt_phones = array_append(alt_phones, $1)
+     WHERE id = $2
+       AND NOT ($1 = ANY(alt_phones))
+       AND COALESCE(TRIM(phone), '') != TRIM($1)`,
+    [phone.trim(), studentId]
+  );
+}
+
+async function addAltEmail(studentId, email) {
+  if (!email) return;
+  await pool.query(
+    `UPDATE Student
+     SET alt_emails = array_append(alt_emails, $1)
+     WHERE id = $2
+       AND NOT ($1 = ANY(alt_emails))
+       AND LOWER(TRIM(COALESCE(email, ''))) != LOWER(TRIM($1))`,
+    [email.trim(), studentId]
+  );
+}
+
 async function findExistingStudentByFullMatch(email, fullName, phone) {
   return pool.query(
     `
@@ -371,6 +404,21 @@ app.get("/courses", async (req, res) => {
   }
 });
 
+app.get("/students/:id", async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT id, name, email, phone, alt_phones, alt_emails FROM Student WHERE id = $1 LIMIT 1`,
+      [req.params.id]
+    );
+    if (result.rowCount === 0) {
+      return res.status(404).json({ error: "Student not found" });
+    }
+    res.json(result.rows[0]);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.get("/students/:id/courses", async (req, res) => {
   try {
     const studentId = req.params.id;
@@ -589,6 +637,16 @@ app.post("/upload-students", upload.single("file"), async (req, res) => {
                 grade: normalizedGrade,
               });
 
+              // Phone differs from existing — record as an alternate phone number
+              if (phone && normalizeField(matchedStudent.phone) !== phone) {
+                await addAltPhone(matchedStudentId, phone);
+                console.log("Alt phone added during auto-merge (email matched, phone differs)", {
+                  matchedStudentId,
+                  newPhone: phone,
+                  existingPhone: matchedStudent.phone,
+                });
+              }
+
               insertedCount += 1;
               console.log("CourseHistory auto-merged (email matched)", {
                 matchedStudentId,
@@ -738,6 +796,17 @@ app.post("/pending-confirmations/:id/merge", async (req, res) => {
       return res.status(400).json({ error: "No matched student available to merge" });
     }
 
+    // Fetch current student contact info to determine what has changed
+    const studentRes = await pool.query(
+      `SELECT email, phone FROM Student WHERE id = $1 LIMIT 1`,
+      [targetStudentId]
+    );
+    if (studentRes.rowCount === 0) {
+      return res.status(404).json({ error: "Matched student not found" });
+    }
+    const existingStudent = studentRes.rows[0];
+
+    // Insert course history (unless it is already there)
     const isDuplicate = await hasDuplicateCourseHistory({
       studentId: targetStudentId,
       courseId: pending.course_id,
@@ -758,6 +827,30 @@ app.post("/pending-confirmations/:id/merge", async (req, res) => {
       });
     }
 
+    // If the imported phone differs from the existing primary phone, record it as an alt phone
+    const importedPhone = normalizeField(pending.imported_phone);
+    const existingPhone = normalizeField(existingStudent.phone);
+    if (importedPhone && importedPhone !== existingPhone) {
+      await addAltPhone(targetStudentId, importedPhone);
+      console.log("Alt phone added during pending merge", {
+        targetStudentId,
+        importedPhone,
+        existingPhone,
+      });
+    }
+
+    // If the imported email differs from the existing primary email, record it as an alt email
+    const importedEmail = normalizeText(pending.imported_email);
+    const existingEmail = normalizeText(existingStudent.email);
+    if (importedEmail && importedEmail !== existingEmail) {
+      await addAltEmail(targetStudentId, importedEmail);
+      console.log("Alt email added during pending merge", {
+        targetStudentId,
+        importedEmail,
+        existingEmail,
+      });
+    }
+
     await pool.query(
       `
       UPDATE PendingStudentConfirmation
@@ -771,7 +864,7 @@ app.post("/pending-confirmations/:id/merge", async (req, res) => {
     await logActivity(
       mergeRequesterId || null,
       "PENDING_MERGED",
-      `Merged pending confirmation #${pendingId} into student ID ${targetStudentId}`
+      `Merged pending confirmation #${pendingId} into student ID ${targetStudentId}${importedPhone && importedPhone !== existingPhone ? ` (added alt phone: ${importedPhone})` : ""}${importedEmail && importedEmail !== existingEmail ? ` (added alt email: ${importedEmail})` : ""}`
     );
     res.json({ message: "Pending confirmation merged successfully" });
   } catch (error) {
@@ -892,7 +985,7 @@ app.delete("/students", async (req, res) => {
 
 const port = process.env.PORT || 3000;
 
-Promise.all([ensurePendingConfirmationTable(), ensurePortalUserTable(), ensureUserActivityLogTable()])
+Promise.all([ensurePendingConfirmationTable(), ensurePortalUserTable(), ensureUserActivityLogTable(), ensureStudentAltContactColumns()])
   .then(() => {
     app.listen(port, () => {
       console.log(`Server running on http://localhost:${port}`);

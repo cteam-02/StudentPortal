@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   GraduationCap,
+  Mail,
+  Phone,
   UserRound
 } from "lucide-react";
 import AppHeader from "../../app/components/AppHeader/AppHeader.jsx";
@@ -18,31 +20,52 @@ function StudentProfileHistory({
   onOpenUsers,
   onLogout,
 }) {
-  const displayName = student?.name || "Student";
-  const displayEmail = student?.email || "No email available";
-  const displayId = student?.id ? String(student.id).padStart(6, "0") : "Unavailable";
+  const [fullStudent, setFullStudent] = useState(student || null);
   const [courses, setCourses] = useState([]);
 
+  const displayName = fullStudent?.name || student?.name || "Student";
+  const displayId = (fullStudent?.id ?? student?.id)
+    ? String(fullStudent?.id ?? student?.id).padStart(6, "0")
+    : "Unavailable";
+
+  // All emails: primary + any alt emails
+  const allEmails = useMemo(() => {
+    const primary = fullStudent?.email || student?.email;
+    const alts = Array.isArray(fullStudent?.alt_emails) ? fullStudent.alt_emails : [];
+    return [primary, ...alts].filter(Boolean);
+  }, [fullStudent, student]);
+
+  // All phones: primary + any alt phones
+  const allPhones = useMemo(() => {
+    const primary = fullStudent?.phone || student?.phone;
+    const alts = Array.isArray(fullStudent?.alt_phones) ? fullStudent.alt_phones : [];
+    return [primary, ...alts].filter(Boolean);
+  }, [fullStudent, student]);
+
   useEffect(() => {
-    if (!student?.id) {
+    const studentId = student?.id;
+    if (!studentId) {
       setCourses([]);
       return;
     }
 
-    const fetchCourses = async () => {
+    const fetchStudentData = async () => {
       try {
-        const response = await fetch(
-          `${API_BASE_URL}/students/${student.id}/courses`
-        );
-        const data = await response.json();
-        setCourses(Array.isArray(data) ? data : []);
+        const [studentRes, coursesRes] = await Promise.all([
+          fetch(`${API_BASE_URL}/students/${studentId}`),
+          fetch(`${API_BASE_URL}/students/${studentId}/courses`),
+        ]);
+        const studentData = await studentRes.json();
+        const coursesData = await coursesRes.json();
+        if (studentRes.ok) setFullStudent(studentData);
+        setCourses(Array.isArray(coursesData) ? coursesData : []);
       } catch (error) {
-        console.error("Error fetching student profile courses:", error);
+        console.error("Error fetching student profile:", error);
         setCourses([]);
       }
     };
 
-    fetchCourses();
+    fetchStudentData();
   }, [student?.id]);
 
   const trainingHistory = useMemo(() => {
@@ -126,9 +149,34 @@ function StudentProfileHistory({
                 <h1>{displayName}</h1>
               </div>
 
-              <p className="profile-meta">
-                Student ID: {displayId} • {displayEmail}
-              </p>
+              <p className="profile-meta">Student ID: {displayId}</p>
+
+              <div className="profile-contact-list">
+                {allEmails.map((email, index) => (
+                  <div key={email} className="profile-contact-item">
+                    <Mail size={13} strokeWidth={2} />
+                    <span>{email}</span>
+                    {index === 0 && allEmails.length > 1 && (
+                      <span className="profile-contact-badge">Primary</span>
+                    )}
+                    {index > 0 && (
+                      <span className="profile-contact-badge is-alt">Alt</span>
+                    )}
+                  </div>
+                ))}
+                {allPhones.map((phone, index) => (
+                  <div key={phone} className="profile-contact-item">
+                    <Phone size={13} strokeWidth={2} />
+                    <span>{phone}</span>
+                    {index === 0 && allPhones.length > 1 && (
+                      <span className="profile-contact-badge">Primary</span>
+                    )}
+                    {index > 0 && (
+                      <span className="profile-contact-badge is-alt">Alt</span>
+                    )}
+                  </div>
+                ))}
+              </div>
 
               <div className="profile-summary-stats">
                 <span>{courses.length} courses</span>
